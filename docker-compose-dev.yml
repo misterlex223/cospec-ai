@@ -1,0 +1,22 @@
+# 功能項目: 1.1.2 建立 docker-compose.yml
+version: '3.8'
+
+services:
+  vditor-app-dev:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: vditor-app-dev
+    ports:
+      - "3000:3000" # 前端端口
+      - "3001:3001" # 後端 API 端口
+    volumes:
+      - ./app:/app # 掛載前端源碼目錄，方便開發
+      - /app/node_modules # 匿名卷，防止本地目錄覆蓋容器內的 node_modules
+      - ./app/server:/server # 掛載後端源碼目錄，方便開發
+      - /server/node_modules # 匿名卷，防止本地目錄覆蓋容器內的 node_modules
+      - ${MARKDOWN_DIR:-./markdown}:/markdown # 掛載 Markdown 文件目錄
+    environment:
+      - MARKDOWN_DIR=/markdown
+      - NODE_ENV=development
+    restart: unless-stopped

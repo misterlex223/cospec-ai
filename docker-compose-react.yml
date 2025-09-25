@@ -1,0 +1,17 @@
+version: '3'
+
+services:
+  vditor-app:
+    build:
+      context: .
+      dockerfile: Dockerfile.react
+    container_name: vditor-app-react
+    ports:
+      - "3000:3000" # 前端端口
+      - "3001:3001" # 後端 API 端口
+    volumes:
+      - ${MARKDOWN_DIR:-./markdown}:/markdown # 掛載 Markdown 文件目錄
+    environment:
+      - MARKDOWN_DIR=/markdown
+      - NODE_ENV=production
+    restart: unless-stopped

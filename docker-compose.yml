@@ -1,0 +1,17 @@
+# 功能項目: 1.1.2 建立 docker-compose.yml
+version: '3.8'
+
+services:
+  vditor-app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: vditor-app
+    ports:
+      - "3000:3000" # 前端端口
+      - "3001:3001" # 後端 API 端口
+    volumes:
+      - ${MARKDOWN_DIR:-./markdown}:/markdown
+    environment:
+      - MARKDOWN_DIR=/markdown
+    restart: unless-stopped
