@@ -8,8 +8,14 @@ WORKDIR /app
 COPY app-react/package*.json ./
 RUN npm install
 
-# 複製前端源碼
-COPY app-react/ ./
+# 複製前端源碼，但排除 node_modules 目錄
+COPY app-react/src ./src
+COPY app-react/public ./public
+COPY app-react/*.js ./
+COPY app-react/*.ts ./
+COPY app-react/*.json ./
+COPY app-react/*.html ./
+COPY app-react/*.cjs ./
 
 # 在開發模式下跳過構建步驟
 # RUN npm run build

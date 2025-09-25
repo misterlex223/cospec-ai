@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect, memo, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { fileApi, type FileInfo } from '../../services/api';
 import { cn } from '../../lib/utils';
@@ -21,7 +21,7 @@ interface FileTreeProps {
  * @see /docs/solved_issues.md#22-文件樹展開閃爍問題
  * @see /docs/requirements.md#31-側邊欄目錄樹
  */
-export function FileTree({ className }: FileTreeProps) {
+function FileTreeComponent({ className }: FileTreeProps) {
   const [files, setFiles] = useState<FileInfo[]>([]);
   const [treeData, setTreeData] = useState<TreeNode[]>([]);
   const [loading, setLoading] = useState(true);
@@ -42,9 +42,19 @@ export function FileTree({ className }: FileTreeProps) {
   useEffect(() => {
     const fetchFiles = async () => {
       try {
-        setLoading(true);
+        // 只在初次加載或手動刷新時顯示加載狀態
+        if (files.length === 0) {
+          setLoading(true);
+        }
+        
         const fileList = await fileApi.getAllFiles();
-        setFiles(fileList);
+        
+        // 比較文件列表是否有變化，只有變化時才更新
+        const hasChanged = JSON.stringify(fileList) !== JSON.stringify(files);
+        if (hasChanged) {
+          setFiles(fileList);
+        }
+        
         setLoading(false);
       } catch (err) {
         setError('Failed to fetch files');
@@ -55,10 +65,10 @@ export function FileTree({ className }: FileTreeProps) {
 
     fetchFiles();
 
-    // 設置定期輪詢
-    const interval = setInterval(fetchFiles, 5000);
+    // 設置定期輪詢，但間隔更長以減少重新渲染
+    const interval = setInterval(fetchFiles, 10000); // 增加到 10 秒
     return () => clearInterval(interval);
-  }, [refreshCounter]); // 添加 refreshCounter 作為依賴項，當它變化時重新獲取文件列表
+  }, [refreshCounter, files]); // 添加 files 作為依賴項，但不會導致無限循環，因為我們有比較邏輯
 
   /**
    * 當前文件路徑變化時，自動展開包含該文件的所有目錄
@@ -184,48 +194,102 @@ export function FileTree({ className }: FileTreeProps) {
     });
   };
 
-  /**
-   * 渲染文件樹
-   * @see /docs/solved_issues.md#22-文件樹展開閃爍問題
-   * @see /docs/requirements.md#311-顯示目錄結構
-   */
-  const renderTree = (nodes: TreeNode[]) => {
+/**
+ * 檔案節點組件 - 使用 memo 避免不必要的重新渲染
+ */
+interface FileNodeProps {
+  node: TreeNode;
+  currentPath: string | null;
+  expandedPaths: Set<string>;
+  onFileClick: (path: string) => void;
+  onDirectoryToggle: (path: string) => void;
+}
+
+const FileNode = memo(({ node, currentPath, expandedPaths, onFileClick, onDirectoryToggle }: FileNodeProps) => {
+  if (node.type === 'directory') {
     return (
-      <ul className="pl-4">
-        {nodes.map((node, index) => (
-          <li key={index} className="py-1">
-            {node.type === 'directory' ? (
-              <div className="group">
-                <div 
-                  className="flex items-center cursor-pointer p-1 hover:bg-gray-100 dark:hover:bg-gray-800 rounded"
-                  onClick={() => handleDirectoryToggle(node.path)}
-                >
-                  <span className="mr-2">
-                    {expandedPaths.has(node.path) ? '📂' : '📁'}
-                  </span>
-                  <span>{node.name}</span>
-                </div>
-                {expandedPaths.has(node.path) && node.children && (
-                  <div className="ml-2">
-                    {renderTree(node.children)}
-                  </div>
-                )}
-              </div>
-            ) : (
-              <div 
-                className={`flex items-center cursor-pointer p-1 rounded ${currentPath === node.path ? 'bg-blue-100 dark:bg-blue-900' : 'hover:bg-gray-100 dark:hover:bg-gray-800'}`}
-                onClick={() => handleFileClick(node.path)}
-              >
-                <span className="mr-2">📄</span>
-                <span className={currentPath === node.path ? 'font-semibold' : ''}>{node.name}</span>
-                {currentPath === node.path && <span className="ml-2 text-xs text-blue-600 dark:text-blue-400">• 當前</span>}
-              </div>
-            )}
-          </li>
-        ))}
-      </ul>
+      <div className="group">
+        <div 
+          className="flex items-center cursor-pointer p-1 hover:bg-gray-100 dark:hover:bg-gray-800 rounded"
+          onClick={() => onDirectoryToggle(node.path)}
+        >
+          <span className="mr-2">
+            {expandedPaths.has(node.path) ? '📂' : '📁'}
+          </span>
+          <span>{node.name}</span>
+        </div>
+        {expandedPaths.has(node.path) && node.children && (
+          <div className="ml-2">
+            <TreeList 
+              nodes={node.children} 
+              currentPath={currentPath} 
+              expandedPaths={expandedPaths} 
+              onFileClick={onFileClick} 
+              onDirectoryToggle={onDirectoryToggle} 
+            />
+          </div>
+        )}
+      </div>
     );
-  };
+  } else {
+    return (
+      <div 
+        className={`flex items-center cursor-pointer p-1 rounded ${currentPath === node.path ? 'bg-blue-100 dark:bg-blue-900' : 'hover:bg-gray-100 dark:hover:bg-gray-800'}`}
+        onClick={() => onFileClick(node.path)}
+      >
+        <span className="mr-2">📄</span>
+        <span className={currentPath === node.path ? 'font-semibold' : ''}>{node.name}</span>
+        {currentPath === node.path && <span className="ml-2 text-xs text-blue-600 dark:text-blue-400">• 當前</span>}
+      </div>
+    );
+  }
+});
+
+/**
+ * 樹列表組件 - 使用 memo 避免不必要的重新渲染
+ */
+interface TreeListProps {
+  nodes: TreeNode[];
+  currentPath: string | null;
+  expandedPaths: Set<string>;
+  onFileClick: (path: string) => void;
+  onDirectoryToggle: (path: string) => void;
+}
+
+const TreeList = memo(({ nodes, currentPath, expandedPaths, onFileClick, onDirectoryToggle }: TreeListProps) => {
+  return (
+    <ul className="pl-4">
+      {nodes.map((node) => (
+        <li key={node.path} className="py-1">
+          <FileNode 
+            node={node} 
+            currentPath={currentPath} 
+            expandedPaths={expandedPaths} 
+            onFileClick={onFileClick} 
+            onDirectoryToggle={onDirectoryToggle} 
+          />
+        </li>
+      ))}
+    </ul>
+  );
+});
+
+/**
+ * 渲染文件樹
+ * @see /docs/solved_issues.md#22-文件樹展開閃爍問題
+ * @see /docs/requirements.md#311-顯示目錄結構
+ */
+const renderTree = (nodes: TreeNode[], currentPath: string | null, expandedPaths: Set<string>, handleFileClick: (path: string) => void, handleDirectoryToggle: (path: string) => void) => {
+  return (
+    <TreeList 
+      nodes={nodes} 
+      currentPath={currentPath} 
+      expandedPaths={expandedPaths} 
+      onFileClick={handleFileClick} 
+      onDirectoryToggle={handleDirectoryToggle} 
+    />
+  );
+};
 
   if (loading) {
     return <div className="p-4">Loading files...</div>;
@@ -234,6 +298,8 @@ export function FileTree({ className }: FileTreeProps) {
   if (error) {
     return <div className="p-4 text-red-500">{error}</div>;
   }
+
+  // 移除此處的 useMemo，避免 Hooks 順序錯誤
 
   return (
     <div className={cn("p-4", className)}>
@@ -268,10 +334,13 @@ export function FileTree({ className }: FileTreeProps) {
         </Button>
       </div>
       {treeData.length > 0 ? (
-        renderTree(treeData)
+        renderTree(treeData, currentPath, expandedPaths, handleFileClick, handleDirectoryToggle)
       ) : (
         <div className="text-gray-500">No files found</div>
       )}
     </div>
   );
 }
+
+// 使用 React.memo 包裝組件，避免不必要的重新渲染
+export const FileTree = React.memo(FileTreeComponent);

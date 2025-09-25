@@ -6,6 +6,13 @@ const cors = require('cors');
 const morgan = require('morgan');
 const { glob } = require('glob');
 const chokidar = require('chokidar');
+// 引入 glob-gitignore 用於處理 .gitignore 過濾
+let globGitignore;
+try {
+  globGitignore = require('glob-gitignore');
+} catch (err) {
+  console.warn('glob-gitignore not available, falling back to standard glob');
+}
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -20,17 +27,51 @@ app.use(morgan('dev'));
 
 // 功能項目: 2.1.3 監控文件變更
 let watcher;
-const setupWatcher = () => {
+const setupWatcher = async () => {
   if (watcher) {
     watcher.close();
   }
 
-  watcher = chokidar.watch(`${MARKDOWN_DIR}/**/*.md`, {
-    ignored: /(^|[\/\\])\../, // 忽略隱藏文件
-    persistent: true
-  });
+  // 檢查是否有 .gitignore 文件
+  const gitignorePath = path.join(MARKDOWN_DIR, '.gitignore');
+  let hasGitignore = false;
+  let gitignoreContent = '';
+  
+  try {
+    await fs.access(gitignorePath);
+    gitignoreContent = await fs.readFile(gitignorePath, 'utf-8');
+    hasGitignore = true;
+    console.log(`Found .gitignore for watcher at ${gitignorePath}`);
+  } catch (error) {
+    console.log('No .gitignore file found for watcher');
+  }
+  
+  const watchOptions = {
+    persistent: true,
+    ignored: [
+      /(^|[\/\\])\../, // 忽略隱藏文件
+      '**/node_modules/**' // 忽略 node_modules 目錄
+    ]
+  };
+  
+  // 如果有 .gitignore 文件，添加到忽略列表
+  if (hasGitignore) {
+    // 將 .gitignore 檔案內容轉換為 chokidar 可用的忽略模式
+    const gitignorePatterns = gitignoreContent
+      .split('\n')
+      .filter(line => line.trim() && !line.startsWith('#'))
+      .map(pattern => {
+        // 確保模式是相對於 MARKDOWN_DIR 的
+        return pattern.startsWith('/') ? pattern.substring(1) : pattern;
+      });
+    
+    // 將模式添加到忽略列表
+    watchOptions.ignored = [...watchOptions.ignored, ...gitignorePatterns.map(p => `${MARKDOWN_DIR}/${p}`)]; 
+  }
 
-  console.log(`Watching for changes in ${MARKDOWN_DIR}`);
+  watcher = chokidar.watch(`${MARKDOWN_DIR}/**/*.md`, watchOptions);
+
+  console.log(`Watching for changes in ${MARKDOWN_DIR} with options:`, watchOptions);
 
   watcher
     .on('add', path => console.log(`File ${path} has been added`))
@@ -48,8 +89,92 @@ app.get('/api/files', async (req, res) => {
       return res.status(404).json({ error: `Markdown directory not found: ${MARKDOWN_DIR}` });
     }
 
-    // 獲取所有 Markdown 文件
-    const files = await glob(`${MARKDOWN_DIR}/**/*.md`);
+    let files = [];
+    
+    // 檢查 .gitignore 文件是否存在
+    const gitignorePath = path.join(MARKDOWN_DIR, '.gitignore');
+    let hasGitignore = false;
+    
+    try {
+      await fs.access(gitignorePath);
+      hasGitignore = true;
+      console.log(`Found .gitignore at ${gitignorePath}`);
+    } catch (error) {
+      console.log('No .gitignore file found, will not filter by gitignore rules');
+    }
+    
+    // 使用 glob-gitignore 如果可用且有 .gitignore 文件
+    if (globGitignore && hasGitignore) {
+      console.log('Using glob-gitignore to filter files');
+      
+      try {
+        // 使用 glob-gitignore 的 glob 方法
+        files = await globGitignore.glob('**/*.md', {
+          cwd: MARKDOWN_DIR,
+          absolute: true,
+          gitignore: { // 指定 gitignore 文件
+            path: gitignorePath
+          },
+          ignore: ['**/node_modules/**'] // 額外忽略 node_modules
+        });
+        
+        console.log(`Found ${files.length} files after gitignore filtering`);
+      } catch (err) {
+        console.error('Error using glob-gitignore:', err);
+        // 如果出錯，回退到標準 glob
+        files = await glob(`${MARKDOWN_DIR}/**/*.md`, {
+          ignore: [`${MARKDOWN_DIR}/**/node_modules/**`]
+        });
+      }
+    } else {
+      // 使用標準 glob，但仍然忽略 node_modules
+      console.log('Using standard glob with node_modules filtering');
+      files = await glob(`${MARKDOWN_DIR}/**/*.md`, {
+        ignore: [`${MARKDOWN_DIR}/**/node_modules/**`]
+      });
+      
+      // 如果有 .gitignore 文件但沒有 glob-gitignore，手動讀取和過濾
+      if (hasGitignore && !globGitignore) {
+        console.log('Manually filtering by .gitignore patterns');
+        try {
+          const gitignoreContent = await fs.readFile(gitignorePath, 'utf-8');
+          const gitignorePatterns = gitignoreContent
+            .split('\n')
+            .filter(line => line.trim() && !line.startsWith('#'))
+            .map(pattern => pattern.trim());
+          
+          console.log('Loaded .gitignore patterns:', gitignorePatterns);
+          
+          files = files.filter(file => {
+            const relativePath = path.relative(MARKDOWN_DIR, file);
+            
+            for (const pattern of gitignorePatterns) {
+              if (pattern.endsWith('/')) {
+                if (relativePath.startsWith(pattern) || relativePath.includes('/' + pattern)) {
+                  return false;
+                }
+              } else if (pattern.includes('*')) {
+                const regexPattern = pattern
+                  .replace(/\./g, '\\.')
+                  .replace(/\*/g, '.*');
+                const regex = new RegExp(`^${regexPattern}$`);
+                if (regex.test(relativePath) || regex.test(path.basename(relativePath))) {
+                  return false;
+                }
+              } else {
+                if (relativePath === pattern || relativePath.endsWith('/' + pattern) || path.basename(relativePath) === pattern) {
+                  return false;
+                }
+              }
+            }
+            
+            return true;
+          });
+        } catch (err) {
+          console.error('Error processing .gitignore:', err);
+        }
+      }
+    }
     
     // 將絕對路徑轉換為相對路徑
     const relativePaths = files.map(file => {
@@ -192,8 +317,13 @@ app.patch('/api/files/:path(*)', async (req, res) => {
 });
 
 // 啟動服務器
-app.listen(PORT, () => {
+app.listen(PORT, async () => {
   console.log(`Server running on port ${PORT}`);
   console.log(`Markdown directory: ${MARKDOWN_DIR}`);
-  setupWatcher();
+  try {
+    await setupWatcher();
+    console.log('File watcher setup complete');
+  } catch (err) {
+    console.error('Error setting up file watcher:', err);
+  }
 });
