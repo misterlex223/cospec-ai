@@ -1,8 +1,9 @@
-import React, { useState, useEffect, memo, useMemo } from 'react';
+import React, { useState, useEffect, memo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { fileApi, type FileInfo } from '../../services/api';
 import { cn } from '../../lib/utils';
 import { Button } from '../ui/button';
+import { webSocketService, connectWebSocket } from '../../services/websocket';
 
 interface TreeNode {
   name: string;
@@ -39,36 +40,120 @@ function FileTreeComponent({ className }: FileTreeProps) {
     ? decodeURIComponent(window.location.pathname.substring(6)) 
     : null;
 
+  // 添加一個狀態追蹤上次更新的時間
+  const [lastUpdateTime, setLastUpdateTime] = useState(0);
+  
+  // 將抓取文件列表的邏輯提取為一個函數
+  const fetchFiles = useCallback(async (showLoading = false) => {
+    try {
+      if (showLoading) {
+        setLoading(true);
+      }
+      
+      const fileList = await fileApi.getAllFiles();
+      
+      // 比較文件列表是否有變化，只有變化時才更新
+      const hasChanged = JSON.stringify(fileList) !== JSON.stringify(files);
+      if (hasChanged) {
+        setFiles(fileList);
+        setLastUpdateTime(Date.now());
+      }
+      
+      setLoading(false);
+    } catch (err) {
+      setError('Failed to fetch files');
+      setLoading(false);
+      console.error('Error fetching files:', err);
+    }
+  }, [files]);
+
+  // 手動刷新文件列表
+  const refreshFiles = useCallback(async () => {
+    try {
+      setLoading(true);
+      // 使用新增的緩存刷新端點
+      await fileApi.refreshFileCache();
+      await fetchFiles(false);
+    } catch (err) {
+      console.error('Error refreshing files:', err);
+      setError('Failed to refresh files');
+      setLoading(false);
+    }
+  }, [fetchFiles]);
+
+  // 初始加載和刷新計數器變化時加載文件
   useEffect(() => {
-    const fetchFiles = async () => {
-      try {
-        // 只在初次加載或手動刷新時顯示加載狀態
-        if (files.length === 0) {
-          setLoading(true);
-        }
-        
-        const fileList = await fileApi.getAllFiles();
-        
-        // 比較文件列表是否有變化，只有變化時才更新
-        const hasChanged = JSON.stringify(fileList) !== JSON.stringify(files);
-        if (hasChanged) {
-          setFiles(fileList);
-        }
-        
-        setLoading(false);
-      } catch (err) {
-        setError('Failed to fetch files');
-        setLoading(false);
-        console.error('Error fetching files:', err);
+    fetchFiles(files.length === 0);
+  }, [refreshCounter, fetchFiles, files.length]);
+
+  // 使用 WebSocket 進行即時更新
+  useEffect(() => {
+    // 連接 WebSocket
+    connectWebSocket();
+    
+    // 監聽文件更新事件
+    const handleFileAdded = (data: any) => {
+      console.log('File added via WebSocket:', data);
+      fetchFiles(false);
+    };
+    
+    const handleFileChanged = (data: any) => {
+      console.log('File changed via WebSocket:', data);
+      // 文件內容變更不需要重新加載文件列表
+    };
+    
+    const handleFileDeleted = (data: any) => {
+      console.log('File deleted via WebSocket:', data);
+      fetchFiles(false);
+    };
+    
+    // 註冊事件監聽器
+    webSocketService.addEventListener('FILE_ADDED', handleFileAdded);
+    webSocketService.addEventListener('FILE_CHANGED', handleFileChanged);
+    webSocketService.addEventListener('FILE_DELETED', handleFileDeleted);
+    
+    // 監聽連接狀態
+    const handleConnection = (data: any) => {
+      if (data.status === 'connected') {
+        console.log('WebSocket connected, fetching files...');
+        fetchFiles(false);
       }
     };
-
-    fetchFiles();
-
-    // 設置定期輪詢，但間隔更長以減少重新渲染
-    const interval = setInterval(fetchFiles, 10000); // 增加到 10 秒
-    return () => clearInterval(interval);
-  }, [refreshCounter, files]); // 添加 files 作為依賴項，但不會導致無限循環，因為我們有比較邏輯
+    
+    webSocketService.addEventListener('connection', handleConnection);
+    
+    // 作為備用，仍然保留一個輪詢機制，但間隔更長
+    const pollInterval = 60000; // 60 秒
+    
+    const interval = setInterval(() => {
+      // 如果 WebSocket 連接正常，則不需要輪詢
+      if (webSocketService.isConnected()) {
+        return;
+      }
+      
+      // 檢查距離上次更新的時間
+      const now = Date.now();
+      const timeSinceLastUpdate = now - lastUpdateTime;
+      
+      // 如果距離上次更新不足 5 秒，則跳過此次輪詢
+      if (lastUpdateTime > 0 && timeSinceLastUpdate < 5000) {
+        console.log('Skipping poll, last update was too recent');
+        return;
+      }
+      
+      console.log('WebSocket not connected, using polling as fallback');
+      fetchFiles(false);
+    }, pollInterval);
+    
+    // 清理函數
+    return () => {
+      clearInterval(interval);
+      webSocketService.removeEventListener('FILE_ADDED', handleFileAdded);
+      webSocketService.removeEventListener('FILE_CHANGED', handleFileChanged);
+      webSocketService.removeEventListener('FILE_DELETED', handleFileDeleted);
+      webSocketService.removeEventListener('connection', handleConnection);
+    };
+  }, [fetchFiles, lastUpdateTime]);
 
   /**
    * 當前文件路徑變化時，自動展開包含該文件的所有目錄
@@ -305,33 +390,42 @@ const renderTree = (nodes: TreeNode[], currentPath: string | null, expandedPaths
     <div className={cn("p-4", className)}>
       <div className="flex justify-between items-center mb-4">
         <h2 className="text-lg font-semibold">Files</h2>
-        <Button 
-          variant="outline" 
-          size="sm"
-          onClick={() => {
-            // prompt 返回的可能是 null，所以需要確保它是字符串
-            let fileName = prompt('Enter new file name:') || '';
-            if (fileName) {
-              // 確保文件名以 .md 結尾
-              if (!fileName.toLowerCase().endsWith('.md')) {
-                fileName = `${fileName}.md`;
+        <div className="flex gap-2">
+          <button
+            className="px-2 py-1 rounded text-sm bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600"
+            onClick={refreshFiles}
+            title="Refresh file list"
+          >
+            🔄
+          </button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              // prompt 返回的可能是 null，所以需要確保它是字符串
+              let fileName = prompt('Enter new file name:') || '';
+              if (fileName) {
+                // 確保文件名以 .md 結尾
+                if (!fileName.toLowerCase().endsWith('.md')) {
+                  fileName = `${fileName}.md`;
+                }
+                
+                fileApi.createFile(fileName, '# New File\n\nStart writing here...')
+                  .then(() => {
+                    // 刷新文件列表，然後導航到新文件
+                    setRefreshCounter(prev => prev + 1);
+                    navigate(`/edit/${encodeURIComponent(fileName)}`);
+                  })
+                  .catch(err => {
+                    console.error('Error creating file:', err);
+                    alert('Failed to create file');
+                  });
               }
-              
-              fileApi.createFile(fileName, '# New File\n\nStart writing here...')
-                .then(() => {
-                  // 刷新文件列表，然後導航到新文件
-                  setRefreshCounter(prev => prev + 1);
-                  navigate(`/edit/${encodeURIComponent(fileName)}`);
-                })
-                .catch(err => {
-                  console.error('Error creating file:', err);
-                  alert('Failed to create file');
-                });
-            }
-          }}
-        >
-          New File
-        </Button>
+            }}
+          >
+            New File
+          </Button>
+        </div>
       </div>
       {treeData.length > 0 ? (
         renderTree(treeData, currentPath, expandedPaths, handleFileClick, handleDirectoryToggle)

@@ -20,6 +20,17 @@ export const fileApi = {
       throw error;
     }
   },
+  
+  // 刷新文件緩存
+  refreshFileCache: async (): Promise<{success: boolean, fileCount: number}> => {
+    try {
+      const response = await api.post('/files/refresh');
+      return response.data;
+    } catch (error) {
+      console.error('Error refreshing file cache:', error);
+      throw error;
+    }
+  },
 
   // 獲取文件內容
   getFileContent: async (path: string): Promise<{ path: string; content: string }> => {
