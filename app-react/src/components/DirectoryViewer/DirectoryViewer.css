@@ -8,33 +8,44 @@
   --gray-light: #f3f4f6; /* gray-100 */
   --gray-medium: #9ca3af; /* gray-400 */
   --gray-dark: #374151; /* gray-700 */
+  
+  /* 確保樣式應用到整個元件 */
+  width: 100%;
+  height: 100%;
+  padding: 1.5rem !important;
+  background-color: white;
 }
 
 /* 麵包屑導航動畫 */
 .breadcrumb-item {
   position: relative;
   transition: all var(--transition-speed) ease;
-  padding: 0.25rem 0.5rem;
+  padding: 0.5rem 0.75rem !important;
   border-radius: 0.375rem;
+  font-weight: 500;
+  font-size: 0.95rem;
 }
 
 .breadcrumb-item:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+  transform: translateY(-2px);
+  box-shadow: 0 3px 6px rgba(0, 0, 0, 0.1);
 }
 
 .breadcrumb-separator {
   position: relative;
   top: -1px;
   color: var(--gray-medium);
+  font-size: 1.2rem;
+  margin: 0 0.5rem !important;
 }
 
 .breadcrumbs-container {
   background-color: var(--gray-light);
-  border-radius: 0.5rem;
-  padding: 0.75rem;
-  margin-bottom: 1.5rem;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+  border-radius: 0.75rem !important;
+  padding: 1rem !important;
+  margin-bottom: 2rem !important;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05) !important;
+  border: 1px solid rgba(0, 0, 0, 0.05);
 }
 
 /* 目錄項目動畫 */
@@ -43,6 +54,8 @@
   cursor: pointer;
   user-select: none;
   transition: all var(--transition-speed) cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1) !important;
+  border: 1px solid #e5e7eb !important;
 }
 
 .directory-item::before {
@@ -51,21 +64,41 @@
   bottom: 0;
   left: 0;
   width: 0;
-  height: 2px;
+  height: 3px;
   background-color: var(--primary-color);
   transition: width var(--transition-speed) ease;
+  z-index: 10;
+}
+
+.directory-item:hover {
+  transform: translateY(-5px) !important;
+  box-shadow: 0 10px 15px rgba(0, 0, 0, 0.1) !important;
 }
 
 .directory-item:hover::before {
   width: 100%;
 }
 
+/* 目錄項目內容樣式 */
+.directory-item .item-icon {
+  width: 48px !important;
+  height: 48px !important;
+  font-size: 1.5rem !important;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px !important;
+  margin-right: 16px !important;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
 /* 列表視圖樣式 */
 .list-view {
-  border-radius: 0.5rem;
+  border-radius: 0.75rem !important;
   overflow: hidden;
-  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1) !important;
   transition: all var(--transition-speed) ease;
+  border: 1px solid rgba(0, 0, 0, 0.05) !important;
 }
 
 .list-header {
@@ -73,16 +106,23 @@
   position: sticky;
   top: 0;
   z-index: 10;
+  background-color: #f9fafb !important;
+  padding: 1rem 1.25rem !important;
+  border-bottom: 2px solid rgba(0, 0, 0, 0.05) !important;
+  font-size: 0.95rem !important;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
 }
 
 .list-item {
   position: relative;
   cursor: pointer;
   transition: all var(--transition-speed) ease;
+  padding: 0.75rem 1.25rem !important;
 }
 
 .list-item:hover {
-  background-color: var(--gray-light);
+  background-color: rgba(59, 130, 246, 0.05) !important;
 }
 
 .list-item::before {
@@ -97,7 +137,18 @@
 }
 
 .list-item:hover::before {
-  width: 3px;
+  width: 4px !important;
+}
+
+/* 列表項目內容 */
+.list-item .truncate {
+  font-weight: 500 !important;
+  font-size: 1rem !important;
+  color: #111827 !important;
+}
+
+.list-item:nth-child(even) {
+  background-color: rgba(249, 250, 251, 0.5) !important;
 }
 
 /* 目錄圖標動畫 */
@@ -177,17 +228,21 @@
   position: relative;
   display: inline-flex;
   align-items: center;
+  font-size: 2rem !important;
+  font-weight: 700 !important;
+  color: #1f2937 !important;
 }
 
 .directory-header h1::after {
   content: '';
   position: absolute;
-  bottom: -4px;
+  bottom: -8px;
   left: 0;
   width: 0;
-  height: 2px;
+  height: 3px;
   background-color: var(--accent-color);
   transition: width var(--transition-speed) ease;
+  border-radius: 3px;
 }
 
 .directory-header h1:hover::after {
@@ -195,21 +250,25 @@
 }
 
 .directory-header {
-  border-bottom: 1px solid rgba(209, 213, 219, 0.5);
-  padding-bottom: 1rem;
-  margin-bottom: 1.5rem;
+  border-bottom: 2px solid rgba(209, 213, 219, 0.8) !important;
+  padding-bottom: 1.5rem !important;
+  margin-bottom: 2rem !important;
   display: flex;
   justify-content: space-between;
   align-items: center;
 }
 
 .directory-icon {
-  font-size: 1.5rem;
-  margin-right: 0.75rem;
+  font-size: 2.5rem !important;
+  margin-right: 1rem !important;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   animation: pulse 2s infinite;
+  background-color: rgba(251, 191, 36, 0.1);
+  padding: 0.5rem;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(251, 191, 36, 0.2);
 }
 
 @keyframes pulse {

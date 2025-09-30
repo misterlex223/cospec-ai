@@ -3,6 +3,7 @@ import { useLocation } from 'react-router-dom';
 import { FileTree } from '../components/FileTree/FileTree';
 import { MarkdownEditor } from '../components/MarkdownEditor/MarkdownEditor';
 import { DirectoryViewer } from '../components/DirectoryViewer/DirectoryViewer';
+import { Navigator } from '../components/Navigator/Navigator';
 
 export function EditorPage() {
   // 使用 useLocation 來獲取完整的 URL 路徑
@@ -149,6 +150,11 @@ export function EditorPage() {
       
       {/* Main content */}
       <div style={{ flex: 1, height: '100%', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+        {/* 只在非目錄模式下顯示 Navigator */}
+        {filePath && !isDirectory && (
+          <Navigator />
+        )}
+        
         <div style={{ flex: 1, overflow: 'auto' }}>
           {filePath ? (
             isDirectory ? (

@@ -3,8 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { fileApi, type FileInfo } from '../../services/api';
 import { cn } from '../../lib/utils';
 
-// 導入圖標元件
-// 如果您的專案中有更好的圖標庫，可以替換這裡的 emoji
+// 導入樣式文件
 import './DirectoryViewer.css';
 
 // 擴展 FileInfo 類型以包含名稱屬性
@@ -82,12 +81,32 @@ export function DirectoryViewer({ directoryPath, className }: DirectoryViewerPro
           ...file,
           name: file.path.split('/').pop() || file.path
         }));
-
-        // 合併並排序（目錄在前，文件在後）
-        const sortedItems = [
-          ...dirItems.sort((a, b) => a.name.localeCompare(b.name)),
-          ...fileItems.sort((a, b) => a.name.localeCompare(b.name))
-        ];
+        
+        // 檢查並確保路徑的唯一性，避免重複 key 錯誤
+        const uniqueItems = new Map<string, DirectoryItem>();
+        
+        // 先添加目錄項目
+        dirItems
+          .sort((a, b) => a.name.localeCompare(b.name))
+          .forEach(item => {
+            uniqueItems.set(item.path, item);
+          });
+          
+        // 再添加文件項目
+        fileItems
+          .sort((a, b) => a.name.localeCompare(b.name))
+          .forEach(item => {
+            // 如果已經存在相同路徑的項目，添加唯一標識符
+            if (uniqueItems.has(item.path)) {
+              const uniquePath = `${item.path}#${Math.random().toString(36).substring(2, 9)}`;
+              uniqueItems.set(uniquePath, { ...item, path: uniquePath });
+            } else {
+              uniqueItems.set(item.path, item);
+            }
+          });
+        
+        // 轉換為數組
+        const sortedItems = Array.from(uniqueItems.values());
 
         setFiles(sortedItems);
 
@@ -167,7 +186,7 @@ export function DirectoryViewer({ directoryPath, className }: DirectoryViewerPro
   };
 
   return (
-    <div className={cn("p-6 directory-viewer", className)}>
+    <div className={cn("directory-viewer", className)}>
       {/* 麵包屑導航 - 改進設計 */}
       <div className="breadcrumbs-container mb-6 bg-gray-50 dark:bg-gray-800 rounded-lg p-3 shadow-sm">
         <div className="flex items-center flex-wrap">
@@ -206,10 +225,10 @@ export function DirectoryViewer({ directoryPath, className }: DirectoryViewerPro
       </div>
 
       {loading ? (
-        <div className="loading-container flex justify-center items-center py-16">
-          <div className="loading-spinner">
-            <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
-            <div className="mt-4 text-gray-600 dark:text-gray-400">Loading directory contents...</div>
+        <div className="loading-container flex justify-center items-center py-20">
+          <div className="loading-spinner bg-white dark:bg-gray-800 p-8 rounded-xl shadow-lg">
+            <div className="animate-spin rounded-full h-16 w-16 border-t-3 border-b-3 border-blue-500"></div>
+            <div className="mt-6 text-gray-600 dark:text-gray-400 text-lg font-medium">Loading directory contents...</div>
           </div>
         </div>
       ) : error ? (
@@ -222,23 +241,33 @@ export function DirectoryViewer({ directoryPath, className }: DirectoryViewerPro
       ) : (
         <>
           {/* 視圖切換 */}
-          <div className="view-toggle flex justify-end mb-4">
-            <div className="bg-gray-100 dark:bg-gray-800 rounded-lg p-1 inline-flex">
+          <div className="view-toggle flex justify-end mb-6">
+            <div className="bg-gray-100 dark:bg-gray-800 rounded-lg p-1.5 inline-flex shadow-md">
               <button 
-                className={`px-3 py-1 rounded-md ${viewMode === 'grid' ? 'bg-white dark:bg-gray-700 shadow-sm' : 'text-gray-500 dark:text-gray-400'}`}
+                className={`px-4 py-2 rounded-md transition-all duration-200 ${viewMode === 'grid' 
+                  ? 'bg-white dark:bg-gray-700 shadow-sm text-blue-600 font-medium' 
+                  : 'text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700'}`}
                 title="Grid view"
                 onClick={() => setViewMode('grid')}
                 aria-label="Grid view"
               >
-                <span>🔍</span>
+                <span className="flex items-center">
+                  <span className="mr-2">🔍</span>
+                  <span>Grid</span>
+                </span>
               </button>
               <button 
-                className={`px-3 py-1 rounded-md ${viewMode === 'list' ? 'bg-white dark:bg-gray-700 shadow-sm' : 'text-gray-500 dark:text-gray-400'}`}
+                className={`px-4 py-2 rounded-md transition-all duration-200 ${viewMode === 'list' 
+                  ? 'bg-white dark:bg-gray-700 shadow-sm text-blue-600 font-medium' 
+                  : 'text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700'}`}
                 title="List view"
                 onClick={() => setViewMode('list')}
                 aria-label="List view"
               >
-                <span>📃</span>
+                <span className="flex items-center">
+                  <span className="mr-2">📃</span>
+                  <span>List</span>
+                </span>
               </button>
             </div>
           </div>
@@ -246,10 +275,10 @@ export function DirectoryViewer({ directoryPath, className }: DirectoryViewerPro
           {/* 文件列表 */}
           <div className="directory-content">
             {files.length === 0 ? (
-              <div className="empty-directory bg-gray-50 dark:bg-gray-800 rounded-lg p-8 text-center">
-                <div className="empty-icon text-4xl mb-3">📂</div>
-                <h3 className="text-lg font-medium mb-2">This directory is empty</h3>
-                <p className="text-gray-500 dark:text-gray-400">No files or folders found in this location.</p>
+              <div className="empty-directory bg-white dark:bg-gray-800 rounded-xl p-12 text-center shadow-md border border-gray-100 dark:border-gray-700">
+                <div className="empty-icon text-6xl mb-6 inline-flex items-center justify-center p-5 bg-gray-50 dark:bg-gray-700 rounded-full">📂</div>
+                <h3 className="text-xl font-semibold mb-3">This directory is empty</h3>
+                <p className="text-gray-500 dark:text-gray-400 max-w-md mx-auto">No files or folders found in this location. Files you create or upload will appear here.</p>
               </div>
             ) : viewMode === 'grid' ? (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">

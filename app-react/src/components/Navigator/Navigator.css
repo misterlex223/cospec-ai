@@ -1,0 +1,276 @@
+/* Navigator 樣式 */
+.navigator {
+  display: flex;
+  align-items: center;
+  background-color: #f9fafb;
+  border-bottom: 1px solid #e5e7eb;
+  padding: 0.5rem 1rem;
+  height: 48px;
+  position: relative;
+  z-index: 50;
+}
+
+.navigator-controls {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  width: 100%;
+}
+
+/* 導航按鈕 */
+.navigator-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 4px;
+  background-color: #ffffff;
+  border: 1px solid #e5e7eb;
+  color: #4b5563;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.navigator-button:hover:not(.disabled) {
+  background-color: #f3f4f6;
+  border-color: #d1d5db;
+}
+
+.navigator-button.disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* 下拉選單按鈕 */
+.navigator-dropdown-container {
+  position: relative;
+  flex: 1;
+}
+
+.navigator-dropdown-button {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  height: 32px;
+  padding: 0 0.75rem;
+  border-radius: 4px;
+  background-color: #ffffff;
+  border: 1px solid #e5e7eb;
+  color: #1f2937;
+  font-size: 0.875rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.navigator-dropdown-button:hover {
+  background-color: #f3f4f6;
+  border-color: #d1d5db;
+}
+
+.navigator-current {
+  flex: 1;
+  text-align: left;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-right: 0.5rem;
+  font-weight: 500;
+}
+
+.navigator-dropdown-arrow {
+  font-size: 0.75rem;
+  color: #6b7280;
+}
+
+/* 下拉選單 */
+.navigator-dropdown {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  margin-top: 0.25rem;
+  background-color: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 4px;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  max-height: 400px;
+  display: flex;
+  flex-direction: column;
+  z-index: 100;
+}
+
+/* 標籤頁 */
+.navigator-tabs {
+  display: flex;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.navigator-tab {
+  flex: 1;
+  padding: 0.5rem;
+  text-align: center;
+  font-size: 0.875rem;
+  color: #6b7280;
+  background-color: #f9fafb;
+  border: none;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.navigator-tab:hover:not(.active) {
+  background-color: #f3f4f6;
+}
+
+.navigator-tab.active {
+  color: #2563eb;
+  background-color: #ffffff;
+  font-weight: 500;
+  border-bottom: 2px solid #2563eb;
+}
+
+/* 內容區域 */
+.navigator-content {
+  overflow-y: auto;
+  max-height: 350px;
+}
+
+/* 列表視圖 */
+.navigator-list {
+  display: flex;
+  flex-direction: column;
+}
+
+.navigator-item {
+  display: flex;
+  align-items: center;
+  padding: 0.5rem 0.75rem;
+  border: none;
+  background-color: transparent;
+  text-align: left;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border-bottom: 1px solid #f3f4f6;
+}
+
+.navigator-item:hover {
+  background-color: #f3f4f6;
+}
+
+.navigator-item.active {
+  background-color: #eff6ff;
+  color: #2563eb;
+}
+
+.navigator-item-icon {
+  margin-right: 0.5rem;
+  font-size: 1rem;
+}
+
+.navigator-item-name {
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 0.875rem;
+}
+
+.navigator-item-time {
+  font-size: 0.75rem;
+  color: #9ca3af;
+  margin-left: 0.5rem;
+}
+
+/* 樹狀視圖 */
+.navigator-tree {
+  display: flex;
+  flex-direction: column;
+}
+
+.navigator-tree-group {
+  margin-bottom: 0.5rem;
+}
+
+.navigator-tree-header {
+  padding: 0.25rem 0.75rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #6b7280;
+  background-color: #f9fafb;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.navigator-tree-items {
+  padding-left: 0.5rem;
+}
+
+/* 空狀態 */
+.navigator-empty {
+  padding: 1rem;
+  text-align: center;
+  color: #9ca3af;
+  font-size: 0.875rem;
+}
+
+/* 深色模式 */
+@media (prefers-color-scheme: dark) {
+  .navigator {
+    background-color: #1f2937;
+    border-color: #374151;
+  }
+  
+  .navigator-button,
+  .navigator-dropdown-button {
+    background-color: #374151;
+    border-color: #4b5563;
+    color: #e5e7eb;
+  }
+  
+  .navigator-button:hover:not(.disabled),
+  .navigator-dropdown-button:hover {
+    background-color: #4b5563;
+    border-color: #6b7280;
+  }
+  
+  .navigator-dropdown {
+    background-color: #1f2937;
+    border-color: #374151;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.2), 0 2px 4px -1px rgba(0, 0, 0, 0.1);
+  }
+  
+  .navigator-tab {
+    background-color: #111827;
+    color: #9ca3af;
+  }
+  
+  .navigator-tab:hover:not(.active) {
+    background-color: #1f2937;
+  }
+  
+  .navigator-tab.active {
+    color: #60a5fa;
+    background-color: #1f2937;
+    border-color: #60a5fa;
+  }
+  
+  .navigator-item:hover {
+    background-color: #374151;
+  }
+  
+  .navigator-item.active {
+    background-color: #1e3a8a;
+    color: #60a5fa;
+  }
+  
+  .navigator-tree-header {
+    background-color: #111827;
+    border-color: #374151;
+    color: #9ca3af;
+  }
+  
+  .navigator-item {
+    border-color: #1f2937;
+  }
+}
