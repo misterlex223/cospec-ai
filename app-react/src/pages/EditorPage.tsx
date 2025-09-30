@@ -1,10 +1,12 @@
 import React, { useState, useCallback, useEffect } from 'react';
-import { useParams } from 'react-router-dom';
+import { useLocation } from 'react-router-dom';
 import { FileTree } from '../components/FileTree/FileTree';
 import { MarkdownEditor } from '../components/MarkdownEditor/MarkdownEditor';
+import { DirectoryViewer } from '../components/DirectoryViewer/DirectoryViewer';
 
 export function EditorPage() {
-  const { path } = useParams<{ path?: string }>();
+  // 使用 useLocation 來獲取完整的 URL 路徑
+  const location = useLocation();
   
   // 從 localStorage 讀取保存的寬度值，如果沒有則使用預設值 280
   const [sidebarWidth, setSidebarWidth] = useState(() => {
@@ -13,7 +15,19 @@ export function EditorPage() {
   });
   // 添加刷新計數器狀態，用於強制重新渲染 FileTree 組件
   const [refreshKey, setRefreshKey] = useState(0);
-  const decodedPath = path ? decodeURIComponent(path) : undefined;
+  
+  // 從 URL 獲取文件路徑（使用未編碼的路徑）
+  const getPathFromUrl = (): string | undefined => {
+    // 從 location.pathname 中提取路徑
+    // 例如 /edit/docs/specs/sfs.md -> docs/specs/sfs.md
+    const match = location.pathname.match(/^\/edit\/(.+)$/);
+    return match ? match[1] : undefined;
+  };
+  
+  const filePath = getPathFromUrl();
+  
+  // 判斷是否為目錄（如果路徑以 / 結尾或沒有副檔名）
+  const isDirectory = filePath ? (filePath.endsWith('/') || !filePath.includes('.')) : false;
   
   // 在組件加載時設置 CSS 變量
   useEffect(() => {
@@ -136,8 +150,14 @@ export function EditorPage() {
       {/* Main content */}
       <div style={{ flex: 1, height: '100%', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
         <div style={{ flex: 1, overflow: 'auto' }}>
-          {decodedPath ? (
-            <MarkdownEditor filePath={decodedPath} />
+          {filePath ? (
+            isDirectory ? (
+              // 如果是目錄，顯示目錄瀏覽器
+              <DirectoryViewer directoryPath={filePath} />
+            ) : (
+              // 如果是文件，顯示 Markdown 編輯器
+              <MarkdownEditor filePath={filePath} />
+            )
           ) : (
             <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <div style={{ textAlign: 'center' }}>

@@ -36,8 +36,9 @@ function FileTreeComponent({ className }: FileTreeProps) {
    * 從 URL 中獲取當前文件路徑
    * @see /docs/solved_issues.md#21-文件樹展開狀態保持
    */
+  // 從 URL 獲取目前路徑，不需要 decodeURIComponent
   const currentPath = window.location.pathname.startsWith('/edit/') 
-    ? decodeURIComponent(window.location.pathname.substring(6)) 
+    ? window.location.pathname.substring(6) 
     : null;
 
   // 添加一個狀態追蹤上次更新的時間
@@ -162,18 +163,24 @@ function FileTreeComponent({ className }: FileTreeProps) {
    */
   useEffect(() => {
     if (currentPath) {
-      // 將文件路徑拆分為目錄路徑
-      const pathParts = currentPath.split('/');
+      // 判斷是否為目錄路徑
+      const isDirectory = currentPath.endsWith('/') || !currentPath.includes('.');
+      
+      // 如果是目錄路徑，展開自身；如果是文件路徑，展開父目錄
+      const pathToExpand = isDirectory ? currentPath : currentPath.substring(0, currentPath.lastIndexOf('/'));
+      const pathParts = pathToExpand.split('/');
       let currentDirPath = '';
       
       // 展開所有父目錄
       setExpandedPaths(prevPaths => {
         const newPaths = new Set(prevPaths);
-        for (let i = 0; i < pathParts.length - 1; i++) {
-          currentDirPath = currentDirPath 
-            ? `${currentDirPath}/${pathParts[i]}` 
-            : pathParts[i];
-          newPaths.add(currentDirPath);
+        for (let i = 0; i < pathParts.length; i++) {
+          if (pathParts[i]) { // 確保不是空字串
+            currentDirPath = currentDirPath 
+              ? `${currentDirPath}/${pathParts[i]}` 
+              : pathParts[i];
+            newPaths.add(currentDirPath);
+          }
         }
         return newPaths;
       });
@@ -258,7 +265,15 @@ function FileTreeComponent({ className }: FileTreeProps) {
   // 移除不需要的代碼
 
   const handleFileClick = (path: string) => {
-    navigate(`/edit/${encodeURIComponent(path)}`);
+    // 使用未編碼的路徑
+    navigate(`/edit/${path}`);
+  };
+  
+  // 處理目錄點擊
+  const handleDirectoryClick = (path: string) => {
+    // 確保目錄路徑以 / 結尾
+    const dirPath = path.endsWith('/') ? path : `${path}/`;
+    navigate(`/edit/${dirPath}`);
   };
 
   /**
@@ -288,20 +303,28 @@ interface FileNodeProps {
   expandedPaths: Set<string>;
   onFileClick: (path: string) => void;
   onDirectoryToggle: (path: string) => void;
+  onDirectoryClick?: (path: string) => void; // 添加目錄點擊處理函數
 }
 
-const FileNode = memo(({ node, currentPath, expandedPaths, onFileClick, onDirectoryToggle }: FileNodeProps) => {
+const FileNode = memo(({ node, currentPath, expandedPaths, onFileClick, onDirectoryToggle, onDirectoryClick }: FileNodeProps) => {
   if (node.type === 'directory') {
     return (
       <div className="group">
         <div 
           className="flex items-center cursor-pointer p-1 hover:bg-gray-100 dark:hover:bg-gray-800 rounded"
-          onClick={() => onDirectoryToggle(node.path)}
         >
-          <span className="mr-2">
+          <span 
+            className="mr-2 cursor-pointer"
+            onClick={() => onDirectoryToggle(node.path)}
+          >
             {expandedPaths.has(node.path) ? '📂' : '📁'}
           </span>
-          <span>{node.name}</span>
+          <span 
+            className="flex-1 cursor-pointer"
+            onClick={() => onDirectoryClick ? onDirectoryClick(node.path) : onDirectoryToggle(node.path)}
+          >
+            {node.name}
+          </span>
         </div>
         {expandedPaths.has(node.path) && node.children && (
           <div className="ml-2">
@@ -339,9 +362,10 @@ interface TreeListProps {
   expandedPaths: Set<string>;
   onFileClick: (path: string) => void;
   onDirectoryToggle: (path: string) => void;
+  onDirectoryClick?: (path: string) => void; // 添加目錄點擊處理函數
 }
 
-const TreeList = memo(({ nodes, currentPath, expandedPaths, onFileClick, onDirectoryToggle }: TreeListProps) => {
+const TreeList = memo(({ nodes, currentPath, expandedPaths, onFileClick, onDirectoryToggle, onDirectoryClick }: TreeListProps) => {
   return (
     <ul className="pl-4">
       {nodes.map((node) => (
@@ -351,7 +375,8 @@ const TreeList = memo(({ nodes, currentPath, expandedPaths, onFileClick, onDirec
             currentPath={currentPath} 
             expandedPaths={expandedPaths} 
             onFileClick={onFileClick} 
-            onDirectoryToggle={onDirectoryToggle} 
+            onDirectoryToggle={onDirectoryToggle}
+            onDirectoryClick={onDirectoryClick}
           />
         </li>
       ))}
@@ -364,14 +389,15 @@ const TreeList = memo(({ nodes, currentPath, expandedPaths, onFileClick, onDirec
  * @see /docs/solved_issues.md#22-文件樹展開閃爍問題
  * @see /docs/requirements.md#311-顯示目錄結構
  */
-const renderTree = (nodes: TreeNode[], currentPath: string | null, expandedPaths: Set<string>, handleFileClick: (path: string) => void, handleDirectoryToggle: (path: string) => void) => {
+const renderTree = (nodes: TreeNode[], currentPath: string | null, expandedPaths: Set<string>, handleFileClick: (path: string) => void, handleDirectoryToggle: (path: string) => void, handleDirectoryClick: (path: string) => void) => {
   return (
     <TreeList 
       nodes={nodes} 
       currentPath={currentPath} 
       expandedPaths={expandedPaths} 
       onFileClick={handleFileClick} 
-      onDirectoryToggle={handleDirectoryToggle} 
+      onDirectoryToggle={handleDirectoryToggle}
+      onDirectoryClick={handleDirectoryClick}
     />
   );
 };
@@ -428,7 +454,7 @@ const renderTree = (nodes: TreeNode[], currentPath: string | null, expandedPaths
         </div>
       </div>
       {treeData.length > 0 ? (
-        renderTree(treeData, currentPath, expandedPaths, handleFileClick, handleDirectoryToggle)
+        renderTree(treeData, currentPath, expandedPaths, handleFileClick, handleDirectoryToggle, handleDirectoryClick)
       ) : (
         <div className="text-gray-500">No files found</div>
       )}

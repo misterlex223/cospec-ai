@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { flushSync } from 'react-dom';
+import { useNavigate } from 'react-router-dom';
 import Vditor from 'vditor';
 import 'vditor/dist/index.css';
 import { fileApi } from '../../services/api';
@@ -45,6 +46,13 @@ export function MarkdownEditor({ filePath, className }: MarkdownEditorProps) {
   const [content, setContent] = useState('');
   // 控制檔案資訊區塊的顯示
   const [showFileInfo, setShowFileInfo] = useState(true);
+  const navigate = useNavigate();
+  
+  // 獲取當前文件的目錄路徑
+  const getCurrentDirectory = () => {
+    const lastSlashIndex = filePath.lastIndexOf('/');
+    return lastSlashIndex > -1 ? filePath.substring(0, lastSlashIndex) : '';
+  };
 
   // 防抖保存功能
   const saveContent = debounce(async (value: string) => {
@@ -142,14 +150,71 @@ export function MarkdownEditor({ filePath, className }: MarkdownEditorProps) {
                   return 'File upload not implemented';
                 }
               },
-              input: (value) => {
+              input: (value: string) => {
                 setContent(value);
                 saveContent(value);
               },
               after: () => {
                 setLoading(false);
                 
-                // 在編輯器初始化後，確保工具欄正確顯示
+                // 在編輯器初始化後，添加連結點擊事件監聽器
+                if (vditorRef.current) {
+                  // 獲取編輯器元素 - 透過 DOM 查詢
+                  const editorElement = document.querySelector('.vditor-content');
+                  if (editorElement) {
+                    editorElement.addEventListener('click', (event) => {
+                      // 將事件轉換為滑鼠事件
+                      const mouseEvent = event as MouseEvent;
+                      // 檢查是否點擊了連結
+                      const target = mouseEvent.target as HTMLElement;
+                      if (target.tagName === 'A') {
+                        // 防止默認行為
+                        event.preventDefault();
+                        
+                        const href = target.getAttribute('href');
+                        
+                        if (href) {
+                          // 判斷是否為相對路徑
+                          if (href.startsWith('./') || href.startsWith('../') || (!href.startsWith('http://') && !href.startsWith('https://') && !href.startsWith('#'))) {
+                            // 處理相對路徑
+                            const currentDir = getCurrentDirectory();
+                            let absolutePath;
+                            
+                            if (href.startsWith('./')) {
+                              // 相對於當前目錄
+                              absolutePath = `${currentDir}/${href.substring(2)}`;
+                            } else if (href.startsWith('../')) {
+                              // 上一層目錄
+                              const parentDir = currentDir.substring(0, currentDir.lastIndexOf('/'));
+                              absolutePath = `${parentDir}/${href.substring(3)}`;
+                            } else {
+                              // 無前綴的相對路徑
+                              absolutePath = `${currentDir}/${href}`;
+                            }
+                            
+                            // 正規化路徑，移除多餘的 './' 和 '../'
+                            const normalizedPath = absolutePath.replace(/\/\.\/|\/[^\/]+\/\.\.\//g, '/');
+                            
+                            // 導航到相應的路徑
+                            navigate(`/edit/${normalizedPath}`);
+                          } else if (href.startsWith('http://') || href.startsWith('https://')) {
+                            // 外部連結，在新標籤頁中開啟
+                            window.open(href, '_blank');
+                          } else if (href.startsWith('#')) {
+                            // 頁內锚點，使用默認行為
+                            const targetId = href.substring(1);
+                            const targetElement = document.getElementById(targetId);
+                            if (targetElement) {
+                              targetElement.scrollIntoView({ behavior: 'smooth' });
+                            }
+                          }
+                        }
+                      }
+                    });
+                  }
+                }
+                
+                // 確保工具欄正確顯示
                 setTimeout(() => {
                   // 確保工具欄可見且不會閃爍
                   const toolbar = document.querySelector('.vditor-toolbar');

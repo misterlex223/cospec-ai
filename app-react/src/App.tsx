@@ -7,7 +7,8 @@ function App() {
       <Routes>
         <Route path="/" element={<Navigate to="/edit" replace />} />
         <Route path="/edit" element={<EditorPage />} />
-        <Route path="/edit/:path" element={<EditorPage />} />
+        {/* Add a catch-all route for unescaped paths */}
+        <Route path="/edit/*" element={<EditorPage />} />
       </Routes>
     </Router>
   );
