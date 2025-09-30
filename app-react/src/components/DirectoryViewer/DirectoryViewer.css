@@ -1,0 +1,309 @@
+/* DirectoryViewer 樣式 */
+.directory-viewer {
+  --transition-speed: 0.2s;
+  --primary-color: #3b82f6; /* blue-500 */
+  --primary-light: #93c5fd; /* blue-300 */
+  --primary-dark: #1d4ed8; /* blue-700 */
+  --accent-color: #f59e0b; /* yellow-500 */
+  --gray-light: #f3f4f6; /* gray-100 */
+  --gray-medium: #9ca3af; /* gray-400 */
+  --gray-dark: #374151; /* gray-700 */
+}
+
+/* 麵包屑導航動畫 */
+.breadcrumb-item {
+  position: relative;
+  transition: all var(--transition-speed) ease;
+  padding: 0.25rem 0.5rem;
+  border-radius: 0.375rem;
+}
+
+.breadcrumb-item:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+}
+
+.breadcrumb-separator {
+  position: relative;
+  top: -1px;
+  color: var(--gray-medium);
+}
+
+.breadcrumbs-container {
+  background-color: var(--gray-light);
+  border-radius: 0.5rem;
+  padding: 0.75rem;
+  margin-bottom: 1.5rem;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+
+/* 目錄項目動畫 */
+.directory-item {
+  position: relative;
+  cursor: pointer;
+  user-select: none;
+  transition: all var(--transition-speed) cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.directory-item::before {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 0;
+  height: 2px;
+  background-color: var(--primary-color);
+  transition: width var(--transition-speed) ease;
+}
+
+.directory-item:hover::before {
+  width: 100%;
+}
+
+/* 列表視圖樣式 */
+.list-view {
+  border-radius: 0.5rem;
+  overflow: hidden;
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
+  transition: all var(--transition-speed) ease;
+}
+
+.list-header {
+  font-weight: 600;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.list-item {
+  position: relative;
+  cursor: pointer;
+  transition: all var(--transition-speed) ease;
+}
+
+.list-item:hover {
+  background-color: var(--gray-light);
+}
+
+.list-item::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 0;
+  background-color: var(--primary-color);
+  transition: width var(--transition-speed) ease;
+}
+
+.list-item:hover::before {
+  width: 3px;
+}
+
+/* 目錄圖標動畫 */
+.item-icon {
+  transition: transform var(--transition-speed) ease;
+}
+
+.directory-item:hover .item-icon {
+  transform: scale(1.1);
+}
+
+/* 加載動畫 */
+.loading-spinner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.loading-container {
+  min-height: 200px;
+}
+
+.loading-spinner .animate-spin {
+  border-color: var(--primary-color) transparent transparent;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* 空目錄樣式 */
+.empty-directory {
+  transition: all var(--transition-speed) ease;
+}
+
+.empty-directory:hover {
+  transform: scale(1.02);
+}
+
+/* 視圖切換按鈕 */
+.view-toggle button {
+  transition: all var(--transition-speed) ease;
+}
+
+.view-toggle button:hover {
+  transform: translateY(-1px);
+}
+
+/* 目錄統計信息 */
+.directory-stats {
+  transition: all var(--transition-speed) ease;
+  background-color: var(--gray-light);
+  color: var(--gray-dark);
+  font-size: 0.875rem;
+  border-radius: 9999px;
+  padding: 0.25rem 0.75rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.directory-stats:hover {
+  transform: scale(1.05);
+  background-color: var(--primary-light);
+  color: var(--primary-dark);
+}
+
+/* 目錄標題動畫 */
+.directory-header h1 {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+
+.directory-header h1::after {
+  content: '';
+  position: absolute;
+  bottom: -4px;
+  left: 0;
+  width: 0;
+  height: 2px;
+  background-color: var(--accent-color);
+  transition: width var(--transition-speed) ease;
+}
+
+.directory-header h1:hover::after {
+  width: 100%;
+}
+
+.directory-header {
+  border-bottom: 1px solid rgba(209, 213, 219, 0.5);
+  padding-bottom: 1rem;
+  margin-bottom: 1.5rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.directory-icon {
+  font-size: 1.5rem;
+  margin-right: 0.75rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.05);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+/* 暗色模式適配 */
+@media (prefers-color-scheme: dark) {
+  .directory-item::before {
+    background-color: #60a5fa; /* dark:blue-400 */
+  }
+}
+
+/* 響應式調整 */
+@media (max-width: 640px) {
+  .directory-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  
+  .directory-stats {
+    margin-top: 8px;
+  }
+}
+
+/* 預覽模態視窗樣式 */
+.markdown-preview {
+  line-height: 1.6;
+  color: var(--gray-dark);
+}
+
+.markdown-preview h1 {
+  font-size: 1.8rem;
+  font-weight: 700;
+  margin: 1.5rem 0 1rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid var(--gray-light);
+}
+
+.markdown-preview h2 {
+  font-size: 1.5rem;
+  font-weight: 600;
+  margin: 1.4rem 0 0.8rem;
+}
+
+.markdown-preview h3 {
+  font-size: 1.3rem;
+  font-weight: 600;
+  margin: 1.2rem 0 0.6rem;
+}
+
+.markdown-preview p {
+  margin: 0.8rem 0;
+}
+
+.markdown-preview li {
+  margin: 0.4rem 0;
+  margin-left: 1.5rem;
+  list-style-type: disc;
+}
+
+/* 模態視窗動畫 */
+@keyframes modalFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.fixed.inset-0.bg-black.bg-opacity-50 {
+  animation: backdropFadeIn 0.2s ease-out;
+}
+
+@keyframes backdropFadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.fixed.inset-0.bg-black.bg-opacity-50 > div {
+  animation: modalFadeIn 0.3s ease-out;
+}
