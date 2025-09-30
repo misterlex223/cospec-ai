@@ -174,8 +174,20 @@ export function MarkdownEditor({ filePath, className }: MarkdownEditorProps) {
                         const href = target.getAttribute('href');
                         
                         if (href) {
-                          // 判斷是否為相對路徑
-                          if (href.startsWith('./') || href.startsWith('../') || (!href.startsWith('http://') && !href.startsWith('https://') && !href.startsWith('#'))) {
+                          // 判斷是否為完整 URL
+                          const isExternalUrl = /^(https?:\/\/|mailto:|tel:|ftp:)/i.test(href);
+                          
+                          if (isExternalUrl) {
+                            // 外部連結，在新標籤頁中開啟
+                            window.open(href, '_blank', 'noopener,noreferrer');
+                          } else if (href.startsWith('#')) {
+                            // 頁內錨點，使用默認行為
+                            const targetId = href.substring(1);
+                            const targetElement = document.getElementById(targetId);
+                            if (targetElement) {
+                              targetElement.scrollIntoView({ behavior: 'smooth' });
+                            }
+                          } else {
                             // 處理相對路徑
                             const currentDir = getCurrentDirectory();
                             let absolutePath;
@@ -187,6 +199,9 @@ export function MarkdownEditor({ filePath, className }: MarkdownEditorProps) {
                               // 上一層目錄
                               const parentDir = currentDir.substring(0, currentDir.lastIndexOf('/'));
                               absolutePath = `${parentDir}/${href.substring(3)}`;
+                            } else if (href.startsWith('/')) {
+                              // 絕對路徑（相對於專案根目錄）
+                              absolutePath = href.substring(1); // 移除開頭的 '/'
                             } else {
                               // 無前綴的相對路徑
                               absolutePath = `${currentDir}/${href}`;
@@ -195,18 +210,9 @@ export function MarkdownEditor({ filePath, className }: MarkdownEditorProps) {
                             // 正規化路徑，移除多餘的 './' 和 '../'
                             const normalizedPath = absolutePath.replace(/\/\.\/|\/[^\/]+\/\.\.\//g, '/');
                             
-                            // 導航到相應的路徑
+                            // 導航到相應的路徑，但保持在目前視窗
+                            console.log(`Navigating to internal path: /edit/${normalizedPath}`);
                             navigate(`/edit/${normalizedPath}`);
-                          } else if (href.startsWith('http://') || href.startsWith('https://')) {
-                            // 外部連結，在新標籤頁中開啟
-                            window.open(href, '_blank');
-                          } else if (href.startsWith('#')) {
-                            // 頁內锚點，使用默認行為
-                            const targetId = href.substring(1);
-                            const targetElement = document.getElementById(targetId);
-                            if (targetElement) {
-                              targetElement.scrollIntoView({ behavior: 'smooth' });
-                            }
                           }
                         }
                       }
