@@ -98,7 +98,7 @@ app.get('/api/files', async (req, res) => {
     try {
       await fs.access(gitignorePath);
       hasGitignore = true;
-      console.log(`Found .gitignore at ${gitignorePath}`);
+      // console.log(`Found .gitignore at ${gitignorePath}`);
     } catch (error) {
       console.log('No .gitignore file found, will not filter by gitignore rules');
     }
@@ -143,7 +143,7 @@ app.get('/api/files', async (req, res) => {
             .filter(line => line.trim() && !line.startsWith('#'))
             .map(pattern => pattern.trim());
           
-          console.log('Loaded .gitignore patterns:', gitignorePatterns);
+          // console.log('Loaded .gitignore patterns:', gitignorePatterns);
           
           files = files.filter(file => {
             const relativePath = path.relative(MARKDOWN_DIR, file);

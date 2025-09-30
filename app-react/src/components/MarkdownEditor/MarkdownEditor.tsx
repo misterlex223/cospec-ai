@@ -4,6 +4,7 @@ import Vditor from 'vditor';
 import 'vditor/dist/index.css';
 import { fileApi } from '../../services/api';
 import { cn } from '../../lib/utils';
+import './MarkdownEditorStyles.css';
 // 簡單的防抖函數實現
 const debounce = <T extends (...args: any[]) => any>(
   func: T,
@@ -42,6 +43,8 @@ export function MarkdownEditor({ filePath, className }: MarkdownEditorProps) {
   const [error, setError] = useState<string | null>(null);
   // 存儲當前編輯器內容，用於初始化編輯器和保存時使用
   const [content, setContent] = useState('');
+  // 控制檔案資訊區塊的顯示
+  const [showFileInfo, setShowFileInfo] = useState(true);
 
   // 防抖保存功能
   const saveContent = debounce(async (value: string) => {
@@ -51,6 +54,15 @@ export function MarkdownEditor({ filePath, className }: MarkdownEditorProps) {
       setError(`Failed to save: ${err instanceof Error ? err.message : String(err)}`);
     }
   }, 1000);
+  
+  // 防抖滾動事件處理
+  const handleScrollDebounced = debounce((scrollTop: number) => {
+    if (scrollTop <= 50) {
+      setShowFileInfo(true);
+    } else if (scrollTop > 50) {
+      setShowFileInfo(false);
+    }
+  }, 200);  // 增加防抖時間以減少更新频率
 
   /**
    * 使用 Promise 封裝編輯器初始化過程
@@ -92,13 +104,13 @@ export function MarkdownEditor({ filePath, className }: MarkdownEditorProps) {
           }
           
           try {
-            // 使用更簡單的配置，避免自定義工具欄問題
+            // 使用更簡單的配置，確保工具欄正確顯示
             vditorRef.current = new Vditor(editorRef.current, {
               height: '100%',
               mode: 'wysiwyg',
               value: fileContent, // 直接使用 fileContent 參數
               placeholder: 'Start editing...',
-              // 使用基本工具欄，不使用可能導致問題的選項
+              // 使用基本工具欄，確保它正確顯示
               toolbar: [
                 'emoji', 'headings', 'bold', 'italic', 'strike', 'link',
                 'list', 'ordered-list', 'check', 'outdent', 'indent',
@@ -107,6 +119,10 @@ export function MarkdownEditor({ filePath, className }: MarkdownEditorProps) {
                 'undo', 'redo',
                 'fullscreen', 'preview'
               ],
+              toolbarConfig: {
+                pin: true, // 固定工具欄
+                hide: false // 確保工具欄不會被隱藏
+              },
               cache: {
                 enable: false
               },
@@ -132,6 +148,52 @@ export function MarkdownEditor({ filePath, className }: MarkdownEditorProps) {
               },
               after: () => {
                 setLoading(false);
+                
+                // 在編輯器初始化後，確保工具欄正確顯示
+                setTimeout(() => {
+                  // 確保工具欄可見且不會閃爍
+                  const toolbar = document.querySelector('.vditor-toolbar');
+                  if (toolbar) {
+                    // 確保工具欄可見
+                    (toolbar as HTMLElement).style.position = 'sticky';
+                    (toolbar as HTMLElement).style.top = '0';
+                    (toolbar as HTMLElement).style.zIndex = '100';
+                    (toolbar as HTMLElement).style.display = 'flex';
+                    (toolbar as HTMLElement).style.flexWrap = 'wrap';
+                    (toolbar as HTMLElement).style.opacity = '1';
+                    (toolbar as HTMLElement).style.visibility = 'visible';
+                    
+                    // 避免閃爍
+                    (toolbar as HTMLElement).style.transition = 'none';
+                    (toolbar as HTMLElement).style.animation = 'none';
+                    (toolbar as HTMLElement).style.willChange = 'transform';
+                    (toolbar as HTMLElement).style.backfaceVisibility = 'hidden';
+                    
+                    // 為檔案資訊標題留出空間
+                    (toolbar as HTMLElement).style.paddingRight = '120px';
+                    
+                    // 確保工具欄不被遮擋
+                    console.log('Toolbar initialized:', toolbar);
+                  } else {
+                    console.error('Toolbar element not found');
+                  }
+                  
+                  // 確保內容區域可滾動且不會閃爍
+                  const content = document.querySelector('.vditor-content');
+                  if (content) {
+                    (content as HTMLElement).style.overflow = 'auto';
+                    (content as HTMLElement).style.transition = 'none';
+                    (content as HTMLElement).style.animation = 'none';
+                    (content as HTMLElement).style.paddingTop = '10px';
+                  }
+                  
+                  // 確保所有編輯器元素不會閃爍
+                  const vditorElements = document.querySelectorAll('.vditor, .vditor-reset, .vditor-wysiwyg');
+                  vditorElements.forEach(el => {
+                    (el as HTMLElement).style.transition = 'none';
+                  });
+                }, 100);
+                
                 resolve(); // 編輯器初始化完成後解析 Promise
               }
             });
@@ -191,34 +253,79 @@ export function MarkdownEditor({ filePath, className }: MarkdownEditorProps) {
     }
   };
 
+  // 載入文件的 useEffect
   useEffect(() => {
     if (filePath) {
       loadFile(filePath);
     }
-
+    
+    // 清理編輯器
     return () => {
       if (vditorRef.current) {
         vditorRef.current.destroy();
         vditorRef.current = null;
       }
     };
-  }, [filePath]);
+  }, [filePath]); // 只在 filePath 變化時重新載入文件
+  
+  // 處理滾動事件的 useEffect
+  useEffect(() => {
+    // 如果還在載入或編輯器未初始化，則不設置監聽器
+    if (loading || !vditorRef.current) return;
+    
+    // 滾動事件處理函數
+    const handleScroll = (e: Event) => {
+      const target = e.target as HTMLElement;
+      if (!target) return;
+      
+      const scrollTop = target.scrollTop || 0;
+      handleScrollDebounced(scrollTop);
+    };
+    
+    // 找到可滾動的內容元素
+    const contentElement = document.querySelector('.vditor-content');
+    if (contentElement) {
+      // 添加滾動事件監聽
+      contentElement.addEventListener('scroll', handleScroll, { passive: true });
+      
+      // 確保內容可以滾動
+      (contentElement as HTMLElement).style.overflow = 'auto';
+    }
+    
+    // 視窗大小變化處理
+    const handleResize = debounce(() => {
+      const content = document.querySelector('.vditor-content');
+      if (content) {
+        (content as HTMLElement).style.overflow = 'auto';
+      }
+    }, 200);
+    
+    window.addEventListener('resize', handleResize);
+    
+    // 清理函數
+    return () => {
+      if (contentElement) {
+        contentElement.removeEventListener('scroll', handleScroll);
+      }
+      window.removeEventListener('resize', handleResize);
+    };
+  }, [loading, handleScrollDebounced]);
 
   // 取得檔案名稱，去除路徑
   const fileName = filePath.split('/').pop() || filePath;
 
   return (
     <div className={cn("relative h-full flex flex-col", className)}>
-      {/* 檔案名稱標題 */}
-      <div className="p-2 border-b bg-gray-50 dark:bg-gray-800 flex items-center">
-        <h2 className="text-lg font-semibold truncate">
+      {/* 檔案名稱標題 - 只在滑到頂部時顯示，但不會影響工具欄操作 */}
+      <div className={`file-info-header ${showFileInfo ? 'visible' : 'hidden'}`}>
+        <h2 className="text-lg font-semibold truncate" title={fileName}>
           <span className="mr-2">📄</span> {/* 檔案圖標 */}
           {fileName}
         </h2>
       </div>
       
-      {/* 編輯器容器 */}
-      <div className="relative flex-1">
+      {/* 編輯器容器 - 確保工具欄可見 */}
+      <div className="flex-1 h-full relative">
         {loading && (
           <div className="absolute inset-0 flex items-center justify-center bg-background/80 z-10">
             <div className="text-lg">Loading...</div>
@@ -229,7 +336,8 @@ export function MarkdownEditor({ filePath, className }: MarkdownEditorProps) {
             <div className="text-lg text-red-500">{error}</div>
           </div>
         )}
-        <div ref={editorRef} className="h-full w-full" />
+        {/* 確保編輯器容器沒有遮擋工具欄的元素 */}
+        <div ref={editorRef} className="h-full w-full" style={{ position: 'relative', zIndex: 1 }} />
       </div>
     </div>
   );

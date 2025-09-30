@@ -1,79 +1,148 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { FileTree } from '../components/FileTree/FileTree';
 import { MarkdownEditor } from '../components/MarkdownEditor/MarkdownEditor';
 
 export function EditorPage() {
   const { path } = useParams<{ path?: string }>();
-  const [sidebarWidth, setSidebarWidth] = useState(280);
+  
+  // 從 localStorage 讀取保存的寬度值，如果沒有則使用預設值 280
+  const [sidebarWidth, setSidebarWidth] = useState(() => {
+    const savedWidth = localStorage.getItem('sidebarWidth');
+    return savedWidth ? parseInt(savedWidth, 10) : 280;
+  });
   // 添加刷新計數器狀態，用於強制重新渲染 FileTree 組件
   const [refreshKey, setRefreshKey] = useState(0);
   const decodedPath = path ? decodeURIComponent(path) : undefined;
+  
+  // 在組件加載時設置 CSS 變量
+  useEffect(() => {
+    document.documentElement.style.setProperty('--sidebar-width', `${sidebarWidth}px`);
+  }, [sidebarWidth]);
   
   // 刷新文件列表
   const refreshFileTree = useCallback(() => {
     setRefreshKey(prev => prev + 1);
   }, []);
 
+  // 簡化的拖曳調整功能，確保它能正常工作
   const startResize = (e: React.MouseEvent<HTMLDivElement>) => {
     e.preventDefault();
+    console.log('Resize started'); // 打印日誌以確認事件觸發
     
+    // 記錄起始位置和寬度
     const startX = e.clientX;
     const startWidth = sidebarWidth;
     
-    const doDrag = (e: MouseEvent) => {
-      const newWidth = Math.max(200, Math.min(500, startWidth + e.clientX - startX));
+    // 直接設置游標樣式，不依賴於 CSS 類
+    document.body.style.cursor = 'col-resize';
+    
+    // 拖曳過程中的處理函數
+    const doDrag = (moveEvent: MouseEvent) => {
+      moveEvent.preventDefault();
+      moveEvent.stopPropagation();
+      
+      // 計算新寬度，設置最小和最大限制
+      const newWidth = Math.max(200, Math.min(600, startWidth + moveEvent.clientX - startX));
+      
+      // 直接設置寬度，不依賴於 CSS 變數
+      const sidebarElement = document.querySelector('.border-r.border-border');
+      if (sidebarElement) {
+        (sidebarElement as HTMLElement).style.width = `${newWidth}px`;
+      }
+      
+      // 更新狀態
       setSidebarWidth(newWidth);
-      document.documentElement.style.setProperty('--sidebar-width', `${newWidth}px`);
+      
+      // 儲存到 localStorage
+      try {
+        localStorage.setItem('sidebarWidth', newWidth.toString());
+      } catch (err) {
+        console.error('Failed to save sidebar width to localStorage:', err);
+      }
     };
     
+    // 停止拖曳的處理函數
     const stopDrag = () => {
+      console.log('Resize ended'); // 打印日誌以確認事件結束
+      
+      // 移除事件監聽器
       document.removeEventListener('mousemove', doDrag);
       document.removeEventListener('mouseup', stopDrag);
+      
+      // 恢復正常游標
+      document.body.style.cursor = '';
     };
     
+    // 添加事件監聽器
     document.addEventListener('mousemove', doDrag);
     document.addEventListener('mouseup', stopDrag);
   };
 
   return (
-    <div className="flex h-screen overflow-hidden bg-background text-foreground">
-      {/* Sidebar */}
+    <div style={{ display: 'flex', flexDirection: 'row', width: '100%', height: '100vh', overflow: 'hidden' }}>
+      {/* Sidebar - 使用直接的內聯樣式確保水平布局 */}
       <div 
-        className="h-full border-r border-border overflow-y-auto flex flex-col"
-        style={{ width: `${sidebarWidth}px` }}
+        style={{ 
+          height: '100%', 
+          width: `${sidebarWidth}px`, 
+          minWidth: '200px', 
+          maxWidth: '600px',
+          borderRight: '1px solid #e2e8f0',
+          overflowY: 'auto',
+          display: 'flex',
+          flexDirection: 'column'
+        }}
       >
-        <div className="p-2 flex justify-between items-center border-b">
-          <h2 className="text-lg font-semibold">Files</h2>
+        <div style={{ padding: '0.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #e2e8f0' }}>
+          <h2 style={{ fontSize: '1.125rem', fontWeight: 600 }}>Files</h2>
           <button 
-            className="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-800"
+            style={{ padding: '0.25rem', borderRadius: '0.25rem', cursor: 'pointer' }}
             onClick={refreshFileTree}
             title="Refresh file list"
           >
             🔄 {/* 刷新圖標 */}
           </button>
         </div>
-        <div className="flex-1 overflow-y-auto">
+        <div style={{ flex: 1, overflowY: 'auto' }}>
           <FileTree key={refreshKey} />
         </div>
       </div>
       
-      {/* Resize handle */}
+      {/* 可拖曳的分隔線 - 使用直接的內聯樣式設定寬度 */}
       <div 
-        className="w-1 bg-border hover:bg-primary cursor-col-resize"
+        className="bg-gray-300 hover:bg-blue-400 relative flex items-center justify-center"
+        style={{ 
+          cursor: 'col-resize',
+          width: '8px', /* 直接設定寬度為 8px */
+          minWidth: '8px', /* 確保最小寬度 */
+          maxWidth: '8px', /* 確保最大寬度 */
+          height: '100%',
+          boxShadow: '0 0 4px rgba(0, 0, 0, 0.2)',
+          zIndex: 10
+        }}
+        title="拖曳調整寬度" /* 添加提示文字 */
         onMouseDown={startResize}
-      />
+      >
+        {/* 更明顯的視覺指示 */}
+        <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            <div style={{ width: '2px', height: '32px', backgroundColor: '#4b5563' }}></div>
+            <div style={{ width: '2px', height: '32px', backgroundColor: '#4b5563' }}></div>
+          </div>
+        </div>
+      </div>
       
       {/* Main content */}
-      <div className="flex-1 h-full overflow-hidden flex flex-col">
-        <div className="flex-1 overflow-auto">
+      <div style={{ flex: 1, height: '100%', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+        <div style={{ flex: 1, overflow: 'auto' }}>
           {decodedPath ? (
             <MarkdownEditor filePath={decodedPath} />
           ) : (
-            <div className="h-full flex items-center justify-center">
-              <div className="text-center">
-                <h3 className="text-xl font-semibold mb-2">Welcome to Vditor Markdown Editor</h3>
-                <p className="text-muted-foreground">Select a file from the sidebar or create a new one.</p>
+            <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <div style={{ textAlign: 'center' }}>
+                <h3 style={{ fontSize: '1.25rem', fontWeight: 600, marginBottom: '0.5rem' }}>Welcome to Vditor Markdown Editor</h3>
+                <p style={{ color: '#6b7280' }}>Select a file from the sidebar or create a new one.</p>
               </div>
             </div>
           )}
