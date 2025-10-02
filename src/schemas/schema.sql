@@ -167,3 +167,24 @@ CREATE TABLE IF NOT EXISTS File_Git_Status (
 );
 CREATE INDEX IF NOT EXISTS idx_file_git_status_file_id ON File_Git_Status(file_id);
 CREATE INDEX IF NOT EXISTS idx_file_git_status_status ON File_Git_Status(git_status);
+
+-- Notifications Table
+CREATE TABLE IF NOT EXISTS Notifications (
+    id TEXT PRIMARY KEY,
+    type TEXT NOT NULL,
+    target_id TEXT,
+    target_type TEXT,
+    user_id TEXT,
+    organization_id TEXT,
+    project_id TEXT,
+    message TEXT NOT NULL,
+    read INTEGER DEFAULT 0,
+    created_at INTEGER NOT NULL,
+    FOREIGN KEY (user_id) REFERENCES Users(id) ON DELETE CASCADE,
+    FOREIGN KEY (organization_id) REFERENCES Organizations(id) ON DELETE CASCADE,
+    FOREIGN KEY (project_id) REFERENCES Projects(id) ON DELETE CASCADE
+);
+CREATE INDEX IF NOT EXISTS idx_notifications_user_id ON Notifications(user_id);
+CREATE INDEX IF NOT EXISTS idx_notifications_org_id ON Notifications(organization_id);
+CREATE INDEX IF NOT EXISTS idx_notifications_project_id ON Notifications(project_id);
+CREATE INDEX IF NOT EXISTS idx_notifications_created_at ON Notifications(created_at);
