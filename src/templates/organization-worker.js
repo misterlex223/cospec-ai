@@ -56,6 +56,11 @@ async function handleApiRequest(request, env, ctx) {
     return await handleUsersApi(request, env, ctx);
   }
   
+  // Notifications API
+  if (path.startsWith('/api/notifications')) {
+    return await handleNotificationsApi(request, env, ctx);
+  }
+  
   // Default API response
   return new Response(JSON.stringify({ error: 'Not Found' }), {
     status: 404,
@@ -71,28 +76,21 @@ async function handleFileRequest(request, env, ctx) {
   const path = url.pathname;
   const method = request.method;
   
-  // Extract project ID and file path from URL
-  const pathParts = path.split('/').filter(Boolean);
-  if (pathParts.length < 3 || pathParts[0] !== 'files') {
-    return new Response(JSON.stringify({ error: 'Invalid file path' }), {
-      status: 400,
-      headers: { 'Content-Type': 'application/json' }
-    });
-  }
-  
-  const projectId = pathParts[1];
-  const filePath = pathParts.slice(2).join('/');
+  // Import file operations
+  const { getFile, saveFile, createFile, deleteFile, renameFile } = await import('../api/files.js');
   
   // Handle different HTTP methods
   switch (method) {
     case 'GET':
-      return await getFile(projectId, filePath, env);
+      return await getFile(request, env);
     case 'PUT':
-      return await createFile(projectId, filePath, request, env);
+      return await createFile(request, env);
     case 'POST':
-      return await updateFile(projectId, filePath, request, env);
+      return await saveFile(request, env);
     case 'DELETE':
-      return await deleteFile(projectId, filePath, env);
+      return await deleteFile(request, env);
+    case 'PATCH':
+      return await renameFile(request, env);
     default:
       return new Response(JSON.stringify({ error: 'Method not allowed' }), {
         status: 405,
@@ -228,6 +226,24 @@ async function handleUsersApi(request, env, ctx) {
   // Implementation will be added later
   return new Response(JSON.stringify({ message: 'Users API not implemented yet' }), {
     status: 501,
+    headers: { 'Content-Type': 'application/json' }
+  });
+}
+
+async function handleNotificationsApi(request, env, ctx) {
+  const url = new URL(request.url);
+  const method = request.method;
+  
+  // Import notifications module
+  const { getNotifications } = await import('../api/notifications.js');
+  
+  // Handle GET requests for polling notifications
+  if (method === 'GET') {
+    return await getNotifications(request, env);
+  }
+  
+  return new Response(JSON.stringify({ error: 'Method not allowed' }), {
+    status: 405,
     headers: { 'Content-Type': 'application/json' }
   });
 }

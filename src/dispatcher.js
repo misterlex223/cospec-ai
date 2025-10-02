@@ -8,12 +8,16 @@
 // Import utilities
 import { extractOrgId, generateResponse } from './utils/dispatcher-utils.js';
 
+import { initializeEnvironment } from './utils/setup.js';
+
 export default {
   /**
    * Handle incoming requests
    */
   async fetch(request, env, ctx) {
     try {
+      // Initialize environment if needed
+      ctx.waitUntil(initializeEnvironment(env));
       // Parse request URL
       const url = new URL(request.url);
       const path = url.pathname;
@@ -55,7 +59,30 @@ async function handleApiRequest(request, env, ctx) {
   
   // API routes
   if (path === '/api/health') {
-    return generateResponse({ status: 'ok' });
+    return generateResponse({ 
+      status: 'ok',
+      version: '1.0.0',
+      timestamp: new Date().toISOString()
+    });
+  }
+  
+  // File operations endpoints
+  if (path.startsWith('/api/files')) {
+    // Handle file list endpoint
+    if (path === '/api/files') {
+      const { listFiles } = await import('./api/files.js');
+      return await listFiles(env);
+    }
+    
+    // Handle file cache refresh endpoint
+    if (path === '/api/files/refresh') {
+      const { refreshFileCache } = await import('./api/files.js');
+      return await refreshFileCache(env);
+    }
+    
+    // For other file operations, dispatch to organization worker
+    const orgId = extractOrgId(request, url) || 'default';
+    return await dispatchToOrgWorker(orgId, request, env, ctx);
   }
   
   // Organization management endpoints
