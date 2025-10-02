@@ -1,7 +1,19 @@
 import axios from 'axios';
 
+// 從環境變量獲取 API URL，默認為 '/api'
+const API_URL = import.meta.env.VITE_API_URL || '/api';
+
 const api = axios.create({
-  baseURL: '/api',
+  baseURL: API_URL,
+});
+
+// 添加請求攔截器以處理 CORS 和認證
+api.interceptors.request.use(config => {
+  // 如果是生產環境且 API 不是相對路徑，添加 CORS 頭
+  if (import.meta.env.VITE_ENV === 'production' && API_URL.startsWith('http')) {
+    config.headers['Access-Control-Allow-Origin'] = '*';
+  }
+  return config;
 });
 
 export interface FileInfo {

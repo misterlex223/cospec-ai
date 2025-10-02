@@ -1,0 +1,21 @@
+{
+  "name": "cospec-editor",
+  "build": {
+    "command": "npm run build",
+    "output_directory": "dist",
+    "root_directory": "app-react"
+  },
+  "routes": [
+    {
+      "pattern": "/api/*",
+      "script": "api_proxy"
+    },
+    {
+      "pattern": "/*",
+      "script": "index"
+    }
+  ],
+  "environment_variables": {
+    "NODE_VERSION": "20"
+  }
+}

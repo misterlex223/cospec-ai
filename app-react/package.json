@@ -7,7 +7,9 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "pages:dev": "wrangler pages dev dist --compatibility-date=2025-10-03",
+    "pages:deploy": "npm run build && wrangler pages deploy dist --project-name=cospec-editor"
   },
   "dependencies": {
     "@radix-ui/react-icons": "^1.3.2",
