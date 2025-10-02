@@ -1,0 +1,23 @@
+name = "cospec-dispatcher"
+main = "src/dispatcher.js"
+compatibility_date = "2025-10-02"
+compatibility_flags = ["nodejs_compat"]
+
+# Workers for Platforms configuration
+workers_for_platforms = true
+
+# D1 Database binding
+[[d1_databases]]
+binding = "COSPEC_DB"
+database_name = "cospec-db"
+database_id = "62b8fdbe-ba21-4f9d-8db6-c965fa2cec5e"
+
+# R2 Storage binding
+[[r2_buckets]]
+binding = "COSPEC_STORAGE"
+bucket_name = "cospec-storage"
+
+# Dispatch namespace binding
+[[dispatch_namespaces]]
+binding = "COSPEC_NAMESPACE"
+namespace = "cospec-namespace"
