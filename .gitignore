@@ -1,4 +1,22 @@
+# Dependencies
 node_modules/
+
+# Build outputs
 work/
-.DS_Store
+dist/
+.output/
+
+# Wrangler local state
+.wrangler/
+.dev.vars
+
+# Cloudflare
+.cloudflare/
+
+# Logs
 *.log
+npm-debug.log*
+
+# System files
+.DS_Store
+Thumbs.db
