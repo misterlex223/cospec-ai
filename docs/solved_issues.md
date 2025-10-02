@@ -55,3 +55,37 @@
   - 使用更基本的工具欄選項
 - **相關文件**：
   - `/app-react/src/components/MarkdownEditor/MarkdownEditor.tsx` - Markdown 編輯器組件
+
+## 4. GitHub 整合問題
+
+### 4.1. 倉庫綁定與認證
+- **問題描述**：需要安全地存儲和管理 GitHub 訪問令牌，同時確保多用戶環境下的隔離性
+- **解決方案**：
+  - 實現加密存儲 GitHub 訪問令牌
+  - 使用 OAuth 應用授權流程代替個人訪問令牌
+  - 為每個專案單獨存儲訪問憑證
+  - 實現令牌自動刷新機制
+- **相關文件**：
+  - `/docs/cloudflare-migration/data-model.md` - 數據模型設計文檔
+  - `/docs/cloudflare-migration/saas-migration-spec.md` - SaaS 遷移規格
+
+### 4.2. Git 操作與文件系統整合
+- **問題描述**：需要將 Git 操作與現有的文件系統功能無縫整合，確保文件狀態一致性
+- **解決方案**：
+  - 實現文件系統操作與 Git 操作的事務性處理
+  - 在文件樹中顯示 Git 狀態標識
+  - 在編輯器中實現差異顯示功能
+  - 添加衝突解決界面
+- **相關文件**：
+  - `/docs/cloudflare-migration/architecture-diagram-fixed.md` - 架構圖文檔
+  - `/docs/requirements.md` - 更新後的需求規格
+
+### 4.3. 多用戶協作衝突
+- **問題描述**：多用戶同時編輯同一文件可能導致 Git 衝突，需要有效的衝突解決機制
+- **解決方案**：
+  - 實現文件鎖定機制，防止同時編輯
+  - 添加實時協作狀態顯示
+  - 開發三向合併界面，輔助用戶解決衝突
+  - 實現自動合併策略，減少簡單衝突的手動處理
+- **相關文件**：
+  - `/docs/cloudflare-migration/migration-strategy.md` - 遷移策略文檔

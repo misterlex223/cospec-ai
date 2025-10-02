@@ -4,6 +4,11 @@
 
 - [requirements.md](requirements.md) - 應用功能需求規格
 - [solved_issues.md](solved_issues.md) - 已解決問題清單
+- [cloudflare-migration/](cloudflare-migration/) - Cloudflare SaaS 遷移規格文檔
+  - [saas-migration-spec.md](cloudflare-migration/saas-migration-spec.md) - SaaS 遷移規格
+  - [data-model.md](cloudflare-migration/data-model.md) - 數據模型設計
+  - [architecture-diagram-fixed.md](cloudflare-migration/architecture-diagram-fixed.md) - 架構圖
+  - [migration-strategy.md](cloudflare-migration/migration-strategy.md) - 遷移策略
 
 ## 代碼標記
 
