@@ -12,7 +12,7 @@ services:
     volumes:
       - ./app-react:/app # 掛載前端源碼目錄，方便開發
       - /app/node_modules # 匿名卷，防止本地目錄覆蓋容器內的 node_modules
-      - ./app/server:/server # 掛載後端源碼目錄，方便開發
+      - ./server:/server # 掛載後端源碼目錄，方便開發
       - /server/node_modules # 匿名卷，防止本地目錄覆蓋容器內的 node_modules
       - ${MARKDOWN_DIR:-./markdown}:/markdown # 掛載 Markdown 文件目錄
     environment:

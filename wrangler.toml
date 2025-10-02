@@ -9,13 +9,12 @@ workers_for_platforms = true
 # Environment configuration
 [env.staging]
 name = "cospec-dispatcher-staging"
-route = "api-staging.cospec.pages.dev/*"
 
 # Staging environment bindings
 [[env.staging.d1_databases]]
 binding = "COSPEC_DB"
 database_name = "cospec-db-staging"
-database_id = "staging-db-id-will-be-generated-after-creation"
+database_id = "ed2b3c0e-8a1c-454f-b572-6ed4f989e878"
 
 [[env.staging.r2_buckets]]
 binding = "COSPEC_STORAGE"
@@ -30,6 +29,12 @@ namespace = "cospec-namespace-staging"
 binding = "COSPEC_DB"
 database_name = "cospec-db"
 database_id = "62b8fdbe-ba21-4f9d-8db6-c965fa2cec5e"
+
+# Staging D1 Database binding
+[[d1_databases]]
+binding = "COSPEC_DB_STAGING"
+database_name = "cospec-db-staging"
+database_id = "ed2b3c0e-8a1c-454f-b572-6ed4f989e878"
 
 # R2 Storage binding
 [[r2_buckets]]

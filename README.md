@@ -1,6 +1,6 @@
 # Vditor Markdown 編輯應用
 
-這個倉庫包含了一個基於 [Vditor](https://github.com/Vanessa219/vditor) 的 Markdown 編輯應用，使用 Docker 容器化，並支持掛載本地目錄作為 Markdown 文件的存儲位置。
+這個倉庫包含了一個基於 [Vditor](https://github.com/Vanessa219/vditor) 的 Markdown 編輯應用，使用 Docker 容器化，並支持掛載本地目錄作為 Markdown 文件的存儲位置。前端使用 React 開發，後端使用 Node.js/Express，並支持部署到 Cloudflare Pages 和 Workers。
 
 ## 功能特點
 
@@ -18,7 +18,7 @@
 
 ## 快速開始
 
-### 標準模式
+### React 版本
 
 1. 克隆此倉庫：
    ```bash
@@ -28,7 +28,7 @@
 
 2. 構建並啟動容器：
    ```bash
-   docker compose up -d
+   docker compose -f docker-compose-react.yml up -d
    ```
 
 3. 在瀏覽器中訪問應用：
@@ -46,12 +46,24 @@
 
 2. 使用環境變數指定 Markdown 文件目錄並啟動容器：
    ```bash
-   MARKDOWN_DIR=/path/to/your/markdown/files docker compose -f docker-compose-dev.yml up -d
+   MARKDOWN_DIR=/path/to/your/markdown/files docker compose -f docker-compose-react-dev.yml up -d
    ```
 
 3. 在瀏覽器中訪問應用：
    ```
    http://localhost:3000
+   ```
+
+### Cloudflare 部署
+
+1. 部署到 Cloudflare Workers 和 Pages：
+   ```bash
+   ./deploy-staging.sh
+   ```
+
+2. 訪問部署的應用：
+   ```
+   https://cospec-staging.pages.dev
    ```
 
 ## 配置
@@ -91,40 +103,50 @@ docker build -t vditor-app .
 運行容器：
 ```bash
 docker run -p 3000:3000 -p 3001:3001 -v /path/to/your/markdown/files:/markdown vditor-app
-```
-
 ## 文件結構
 
 ```
 .
-├── app/                  # 應用程式源碼
-│   ├── public/           # 公共資源
-│   ├── server/           # 後端 API 服務
-│   ├── src/              # 前端源碼
-│   │   ├── assets/        # 靜態資源
-│   │   ├── components/    # Vue 組件
-│   │   ├── router/        # 路由配置
-│   │   ├── stores/        # Pinia 狀態管理
-│   │   ├── utils/         # 工具函數
-│   │   └── views/         # 頁面視圖
-│   ├── .env               # 環境變數
-│   ├── index.html         # HTML 入口
-│   ├── package.json       # 前端依賴
-│   └── vite.config.js     # Vite 配置
-├── docs/                 # 功能需求文檔
-├── Dockerfile            # Docker 構建文件
-├── docker-compose.yml    # 標準模式的 Docker Compose 配置
-├── docker-compose-dev.yml # 開發模式的 Docker Compose 配置
-├── docker-entrypoint.sh  # 容器入口點腳本
-├── markdown/             # 默認的 Markdown 文件目錄
+│── app-react/            # React 前端應用程式
+│   │── public/           # 公共資源
+│   │── src/              # 前端源碼
+│   │   │── components/    # React 組件
+│   │   │── contexts/      # React 上下文
+│   │   │── hooks/         # 自定義 hooks
+│   │   │── lib/           # 库文件
+│   │   │── services/      # 服務層
+│   │   └── utils/         # 工具函數
+│   │── .env               # 開發環境變數
+│   │── .env.production    # 生產環境變數
+│   │── .env.staging      # 測試環境變數
+│   │── index.html         # HTML 入口
+│   │── package.json       # 前端依賴
+│   └── vite.config.ts     # Vite 配置
+│── docs/                 # 功能需求文檔
+│── server/               # 後端 API 服務
+│   │── index.js          # 後端入口點
+│   └── package.json      # 後端依賴
+│── src/                  # Cloudflare Workers 源碼
+│   │── api/              # API 處理函數
+│   │── utils/            # 工具函數
+│   │── schemas/          # 數據庫結構
+│   └── templates/        # Worker 模板
+│── deploy-staging.sh     # 部署腳本
+│── Dockerfile.react      # React 版本 Docker 構建文件
+│── docker-compose-react.yml    # 標準模式的 Docker Compose 配置
+│── docker-compose-react-dev.yml # 開發模式的 Docker Compose 配置
+│── docker-entrypoint-react.sh  # 容器入口點腳本
+│── markdown/             # 默認的 Markdown 文件目錄
+│── wrangler.toml         # Cloudflare Workers 配置
 └── README.md             # 說明文件
 ```
 
-## 技術梱手
+## 技術棲手
 
-- **前端**：Vue 3, Vite, Pinia, Vue Router, Vditor
-- **後端**：Node.js, Express
-- **容器化**：Docker, Docker Compose
+- **前端**: React, TypeScript, Vite, TailwindCSS, Shadcn/UI, Vditor
+- **後端**: Node.js, Express
+- **雲端**: Cloudflare Pages, Cloudflare Workers, D1 數據庫, R2 存儲
+- **容器化**: Docker, Docker Compose
 
 ## 授權許可
 
