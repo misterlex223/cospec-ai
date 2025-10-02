@@ -349,21 +349,61 @@ async function handleApiRequest(request, env, ctx) {
       return await refreshFileCache(env);
     }
     
+    // Handle file operations
+    if (path.startsWith('/api/files/') && path !== '/api/files/refresh') {
+      const filePath = getFilePath(request);
+      if (!filePath) {
+        return generateResponse({ error: 'Invalid file path' }, { status: 400 });
+      }
+      
+      // Handle file operations based on HTTP method
+      if (request.method === 'GET') {
+        const { getFile } = await import('./api/files.js');
+        return await getFile(request, env);
+      } else if (request.method === 'PUT') {
+        // Authenticate request
+        const user = await legacyAuthenticateRequest(request, env);
+        if (!user) {
+          return generateResponse({ error: 'Unauthorized' }, { status: 401 });
+        }
+        
+        const { saveFile } = await import('./api/files.js');
+        return await saveFile(request, env);
+      } else if (request.method === 'POST') {
+        // Authenticate request
+        const user = await legacyAuthenticateRequest(request, env);
+        if (!user) {
+          return generateResponse({ error: 'Unauthorized' }, { status: 401 });
+        }
+        
+        const { createFile } = await import('./api/files.js');
+        return await createFile(request, env);
+      } else if (request.method === 'DELETE') {
+        // Authenticate request
+        const user = await legacyAuthenticateRequest(request, env);
+        if (!user) {
+          return generateResponse({ error: 'Unauthorized' }, { status: 401 });
+        }
+        
+        const { deleteFile } = await import('./api/files.js');
+        return await deleteFile(request, env);
+      } else if (request.method === 'PATCH') {
+        // Authenticate request
+        const user = await legacyAuthenticateRequest(request, env);
+        if (!user) {
+          return generateResponse({ error: 'Unauthorized' }, { status: 401 });
+        }
+        
+        const { renameFile } = await import('./api/files.js');
+        return await renameFile(request, env);
+      } else {
+        return generateResponse({ error: 'Method not allowed' }, { status: 405 });
+      }
+    }
+    
     // For other file operations, dispatch to organization worker
     const orgId = extractOrgId(request, url) || 'default';
     return await dispatchToOrgWorker(orgId, request, env, ctx);
-  }
-  
-  // Organization management endpoints
-  if (path.startsWith('/api/organizations')) {
-    // Authenticate request
-    const user = await authenticateRequest(request, env);
-    if (!user) {
-      return generateResponse({ error: 'Unauthorized' }, { status: 401 });
-    }
-    
-    // Handle organization CRUD operations
-    // ...
   }
   
   // Default API response
@@ -380,17 +420,20 @@ async function handleAuthRequest(request, env, ctx) {
   // Auth routes
   if (path === '/auth/login') {
     // Handle login
-    // ...
+    const { loginUser } = await import('./api/users.js');
+    return await loginUser(request, env);
   }
   
   if (path === '/auth/register') {
     // Handle registration
-    // ...
+    const { registerUser } = await import('./api/users.js');
+    return await registerUser(request, env);
   }
   
   if (path === '/auth/logout') {
     // Handle logout
-    // ...
+    // TODO: Implement logout
+    return generateResponse({ success: true });
   }
   
   // Default auth response
@@ -486,9 +529,20 @@ function getContentType(path) {
 }
 
 /**
- * Authenticate request
+ * Helper function to get file path from request
  */
-async function authenticateRequest(request, env) {
+function getFilePath(request) {
+  const url = new URL(request.url);
+  const pathMatch = url.pathname.match(/^\/api\/files\/(.*)/);
+  return pathMatch ? decodeURIComponent(pathMatch[1]) : null;
+}
+
+/**
+ * Legacy authenticate request function
+ * This is kept for backward compatibility
+ * Use the imported authenticateRequest from utils/auth.js instead
+ */
+async function legacyAuthenticateRequest(request, env) {
   // Extract token from Authorization header
   const authHeader = request.headers.get('Authorization');
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
