@@ -6,6 +6,25 @@ compatibility_flags = ["nodejs_compat"]
 # Workers for Platforms configuration
 workers_for_platforms = true
 
+# Environment configuration
+[env.staging]
+name = "cospec-dispatcher-staging"
+route = "api-staging.cospec.pages.dev/*"
+
+# Staging environment bindings
+[[env.staging.d1_databases]]
+binding = "COSPEC_DB"
+database_name = "cospec-db-staging"
+database_id = "staging-db-id-will-be-generated-after-creation"
+
+[[env.staging.r2_buckets]]
+binding = "COSPEC_STORAGE"
+bucket_name = "cospec-storage-staging"
+
+[[env.staging.dispatch_namespaces]]
+binding = "COSPEC_NAMESPACE"
+namespace = "cospec-namespace-staging"
+
 # D1 Database binding
 [[d1_databases]]
 binding = "COSPEC_DB"
