@@ -1,9 +1,9 @@
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { EditorPage } from './pages/EditorPage';
 import OrganizationList from './components/OrganizationList';
-import ProjectList from './components/ProjectList';
-import ProjectFiles from './components/ProjectFiles';
-import FileEditor from './components/FileEditor';
+import ProjectList from './components/ProjectList/ProjectList';
+import ProjectFiles from './components/ProjectFiles/ProjectFiles';
+import FileEditor from './components/FileEditor/FileEditor';
 import ApiTest from './components/ApiTest';
 import LoginPage from './components/auth/LoginPage';
 import RegisterPage from './components/auth/RegisterPage';
@@ -11,10 +11,14 @@ import { AuthProvider } from './components/auth/AuthContext';
 import ProtectedRoute from './components/auth/ProtectedRoute';
 import PersonalSpace from './components/PersonalSpace';
 
+// 添加 Toaster 組件用於通知
+import { Toaster } from 'sonner';
+
 function App() {
   return (
     <Router>
       <AuthProvider>
+        <Toaster position="top-right" richColors />
         <Routes>
           {/* Auth routes */}
           <Route path="/login" element={<LoginPage />} />

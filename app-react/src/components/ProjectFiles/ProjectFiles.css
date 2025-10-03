@@ -1,0 +1,175 @@
+/* ProjectFiles component styles */
+
+.file-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+.file-table th {
+  font-weight: 500;
+  text-align: left;
+  padding: 0.75rem 1rem;
+  color: var(--muted-foreground);
+  font-size: 0.875rem;
+}
+
+.file-table td {
+  padding: 0.75rem 1rem;
+  vertical-align: middle;
+}
+
+.file-table tr {
+  transition: background-color 0.2s;
+}
+
+.file-table tr:hover {
+  background-color: rgba(0, 0, 0, 0.02);
+}
+
+.file-table tr.selected {
+  background-color: rgba(var(--primary), 0.05);
+}
+
+.file-name {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.file-icon {
+  color: var(--muted-foreground);
+  flex-shrink: 0;
+}
+
+.file-status-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.125rem 0.5rem;
+  border-radius: 9999px;
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+
+.file-status-badge.synced {
+  background-color: var(--primary);
+  color: var(--primary-foreground);
+}
+
+.file-status-badge.modified {
+  background-color: var(--secondary);
+  color: var(--secondary-foreground);
+}
+
+.file-status-badge.new {
+  background-color: transparent;
+  border: 1px solid var(--border);
+  color: var(--foreground);
+}
+
+.file-meta {
+  color: var(--muted-foreground);
+  font-size: 0.875rem;
+}
+
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 3rem 0;
+  text-align: center;
+}
+
+.empty-state-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 4rem;
+  height: 4rem;
+  border-radius: 9999px;
+  background-color: rgba(var(--primary), 0.1);
+  margin-bottom: 1rem;
+}
+
+.empty-state-icon svg {
+  width: 2rem;
+  height: 2rem;
+  color: var(--primary);
+}
+
+.github-info {
+  display: flex;
+  align-items: center;
+  padding: 0.75rem;
+  background-color: var(--muted);
+  border-radius: 0.375rem;
+  margin-bottom: 1.5rem;
+}
+
+.github-info svg {
+  color: var(--muted-foreground);
+  margin-right: 0.5rem;
+}
+
+.github-info-text {
+  font-size: 0.875rem;
+  color: var(--muted-foreground);
+}
+
+.github-repo {
+  font-weight: 500;
+}
+
+/* Custom checkbox styles */
+.checkbox-container {
+  position: relative;
+  display: inline-block;
+  width: 1rem;
+  height: 1rem;
+}
+
+.checkbox-input {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.checkbox-custom {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 1rem;
+  height: 1rem;
+  border: 1px solid var(--border);
+  border-radius: 0.25rem;
+  background-color: var(--background);
+  transition: all 0.2s;
+}
+
+.checkbox-input:checked + .checkbox-custom {
+  background-color: var(--primary);
+  border-color: var(--primary);
+}
+
+.checkbox-custom::after {
+  content: '';
+  position: absolute;
+  display: none;
+  left: 0.3125rem;
+  top: 0.125rem;
+  width: 0.375rem;
+  height: 0.625rem;
+  border: solid white;
+  border-width: 0 0.125rem 0.125rem 0;
+  transform: rotate(45deg);
+}
+
+.checkbox-input:checked + .checkbox-custom::after {
+  display: block;
+}
+
+.checkbox-input:focus + .checkbox-custom {
+  box-shadow: 0 0 0 2px rgba(var(--primary), 0.2);
+}

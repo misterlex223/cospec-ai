@@ -6,24 +6,26 @@
   position: relative;
   height: 100%;
   width: 100%;
+  background-color: white;
+  border-radius: 0.5rem;
 }
 
 /* 檔案資訊頭部樣式 - 調整位置避免與工具欄重疊 */
 .file-info-header {
   padding: 0.5rem;
-  border-bottom: 1px solid #e2e8f0;
-  background-color: transparent; /* 改為透明背景 */
+  border-bottom: 1px solid var(--border);
+  background-color: transparent;
   display: flex;
   align-items: center;
-  justify-content: flex-end; /* 將內容推到右選 */
+  justify-content: flex-end;
   transition: opacity 0.3s ease;
   position: fixed;
   top: 0;
   left: 0;
   right: 0;
-  z-index: 150; /* 比工具欄的 z-index 更高 */
+  z-index: 150;
   height: 40px;
-  pointer-events: none; /* 允許點擊穿透到工具欄 */
+  pointer-events: none;
 }
 
 .file-info-header.visible {
@@ -37,28 +39,19 @@
 
 /* 檔案資訊標題文字樣式 */
 .file-info-header h2 {
-  pointer-events: auto; /* 允許標題文字可點擊 */
-  background-color: rgba(248, 250, 252, 0.8); /* 半透明背景 */
-  padding: 0.25rem 0.5rem;
+  pointer-events: auto;
+  background-color: rgba(255, 255, 255, 0.9);
+  padding: 0.25rem 0.75rem;
   border-radius: 0.25rem;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
-  margin-left: auto; /* 將標題推到右選 */
-  margin-right: 1rem; /* 右側留一些空間 */
-}
-
-/* 暗黑模式下的檔案資訊標題 */
-@media (prefers-color-scheme: dark) {
-  .file-info-header h2 {
-    background-color: rgba(30, 41, 59, 0.8);
-  }
-}
-
-/* 暗黑模式下的樣式 */
-@media (prefers-color-scheme: dark) {
-  .file-info-header {
-    background-color: #1e293b;
-    border-color: #334155;
-  }
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  margin-left: auto;
+  margin-right: 1rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--foreground);
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
 }
 
 /* 全局樣式，用於覆蓋 Vditor 的樣式 */
@@ -71,68 +64,74 @@
   position: sticky !important;
   top: 0 !important;
   z-index: 100 !important;
-  background-color: #fff !important;
-  border-bottom: 1px solid #e2e8f0 !important;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05) !important;
-  /* 確保工具欄可見 */
+  background-color: #f9fafb !important;
+  border-bottom: 1px solid var(--border) !important;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05) !important;
   display: flex !important;
   flex-wrap: wrap !important;
   opacity: 1 !important;
   visibility: visible !important;
-  /* 避免閃爍 */
   transition: none !important;
   animation: none !important;
   will-change: transform !important;
   backface-visibility: hidden !important;
   transform: translateZ(0) !important;
-  /* 調整工具欄內邊距 */
-  padding-right: 120px !important; /* 為檔案資訊標題留出空間 */
+  padding: 0.5rem !important;
+  padding-right: 120px !important;
 }
 
-/* 暗黑模式下的工具欄樣式 */
-@media (prefers-color-scheme: dark) {
-  .vditor-toolbar {
-    background-color: #1e293b !important;
-    border-color: #334155 !important;
-  }
-}
-
-/* 為 Vditor 內容區域添加適當的內邊距，避免被固定工具欄遮擋 */
+/* 為 Vditor 內容區域添加適當的內邊距 */
 .vditor-content {
-  padding-top: 10px !important;
+  padding: 1rem !important;
   margin-top: 0 !important;
   overflow: auto !important;
-  /* 避免閃爍 */
   transition: none !important;
   animation: none !important;
   will-change: transform !important;
   backface-visibility: hidden !important;
+  font-size: 16px !important;
+  line-height: 1.6 !important;
 }
 
 /* 確保 Vditor 編輯區域有正確的高度 */
 .vditor {
   height: 100% !important;
   position: relative !important;
-  /* 避免閃爍 */
   transition: none !important;
   animation: none !important;
-}
-
-/* 確保編輯器容器有正確的層級和定位 */
-.editor-container .vditor {
   border: none !important;
+  border-radius: 0.5rem !important;
+  overflow: hidden !important;
 }
 
 /* 修復工具欄顯示問題 */
 .vditor-toolbar {
   display: flex !important;
   flex-wrap: wrap !important;
+  gap: 0.25rem !important;
+}
+
+.vditor-toolbar button {
+  border-radius: 0.25rem !important;
+  padding: 0.25rem !important;
+  margin: 0 0.125rem !important;
+  transition: background-color 0.2s !important;
+}
+
+.vditor-toolbar button:hover {
+  background-color: rgba(0, 0, 0, 0.05) !important;
+}
+
+.vditor-toolbar button.vditor-menu--current {
+  background-color: rgba(var(--primary), 0.1) !important;
+  color: var(--primary) !important;
 }
 
 /* 確保編輯器內容不會閃爍 */
 .vditor-wysiwyg, .vditor-ir, .vditor-sv {
   transition: none !important;
   animation: none !important;
+  padding: 1rem !important;
 }
 
 /* 確保所有編輯器元素不會閃爍 */
@@ -140,10 +139,116 @@
   margin-top: 0 !important;
   transition: none !important;
   animation: none !important;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif !important;
+}
+
+/* 標題樣式 */
+.vditor-reset h1 {
+  font-size: 2rem !important;
+  margin-top: 2rem !important;
+  margin-bottom: 1rem !important;
+  font-weight: 600 !important;
+  color: var(--foreground) !important;
+  border-bottom: 1px solid var(--border) !important;
+  padding-bottom: 0.5rem !important;
+}
+
+.vditor-reset h2 {
+  font-size: 1.5rem !important;
+  margin-top: 1.5rem !important;
+  margin-bottom: 0.75rem !important;
+  font-weight: 600 !important;
+  color: var(--foreground) !important;
+}
+
+.vditor-reset h3 {
+  font-size: 1.25rem !important;
+  margin-top: 1.25rem !important;
+  margin-bottom: 0.5rem !important;
+  font-weight: 600 !important;
+  color: var(--foreground) !important;
+}
+
+/* 列表樣式 */
+.vditor-reset ul, .vditor-reset ol {
+  padding-left: 1.5rem !important;
+  margin: 1rem 0 !important;
+}
+
+.vditor-reset li {
+  margin: 0.25rem 0 !important;
+}
+
+/* 代碼塊樣式 */
+.vditor-reset pre {
+  background-color: #f8f9fa !important;
+  border-radius: 0.375rem !important;
+  padding: 1rem !important;
+  margin: 1rem 0 !important;
+  overflow-x: auto !important;
+  border: 1px solid var(--border) !important;
+}
+
+.vditor-reset code {
+  font-family: SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace !important;
+  font-size: 0.875rem !important;
+  padding: 0.125rem 0.25rem !important;
+  border-radius: 0.25rem !important;
+  background-color: rgba(0, 0, 0, 0.05) !important;
+}
+
+/* 表格樣式 */
+.vditor-reset table {
+  border-collapse: collapse !important;
+  width: 100% !important;
+  margin: 1rem 0 !important;
+  border: 1px solid var(--border) !important;
+}
+
+.vditor-reset th, .vditor-reset td {
+  border: 1px solid var(--border) !important;
+  padding: 0.5rem !important;
+  text-align: left !important;
+}
+
+.vditor-reset th {
+  background-color: #f8f9fa !important;
+  font-weight: 600 !important;
+}
+
+/* 引用樣式 */
+.vditor-reset blockquote {
+  border-left: 4px solid var(--primary) !important;
+  padding-left: 1rem !important;
+  margin: 1rem 0 !important;
+  color: var(--muted-foreground) !important;
 }
 
 /* 確保整個編輯器容器穩定 */
 .flex-1.h-full {
   position: relative;
   overflow: hidden;
+  border-radius: 0.5rem;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+/* Git diff 樣式 */
+.git-diff-added {
+  background-color: rgba(74, 222, 128, 0.1) !important;
+  border-left: 3px solid rgb(74, 222, 128) !important;
+  padding-left: 0.5rem !important;
+}
+
+.git-diff-modified {
+  background-color: rgba(250, 204, 21, 0.1) !important;
+  border-left: 3px solid rgb(250, 204, 21) !important;
+  padding-left: 0.5rem !important;
+}
+
+.git-diff-deleted {
+  background-color: rgba(248, 113, 113, 0.1) !important;
+  border-left: 3px solid rgb(248, 113, 113) !important;
+  text-decoration: line-through !important;
+  opacity: 0.7 !important;
+  padding-left: 0.5rem !important;
 }

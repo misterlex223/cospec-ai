@@ -1,0 +1,88 @@
+/* FileEditor component styles */
+
+/* Vditor overrides */
+.vditor {
+  border: none !important;
+}
+
+.vditor-toolbar {
+  background-color: #f9fafb !important;
+  border-bottom: 1px solid var(--border) !important;
+}
+
+.vditor-ir {
+  font-size: 16px !important;
+  padding: 1rem !important;
+}
+
+.vditor-reset {
+  font-size: 16px !important;
+}
+
+/* Git diff indicators */
+.git-diff-added {
+  background-color: rgba(74, 222, 128, 0.1);
+  border-left: 3px solid rgb(74, 222, 128);
+}
+
+.git-diff-modified {
+  background-color: rgba(250, 204, 21, 0.1);
+  border-left: 3px solid rgb(250, 204, 21);
+}
+
+.git-diff-deleted {
+  background-color: rgba(248, 113, 113, 0.1);
+  border-left: 3px solid rgb(248, 113, 113);
+  text-decoration: line-through;
+  opacity: 0.7;
+}
+
+/* File menu */
+.file-menu {
+  position: absolute;
+  right: 0;
+  top: 100%;
+  width: 200px;
+  background-color: white;
+  border: 1px solid var(--border);
+  border-radius: 0.375rem;
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+  z-index: 50;
+  overflow: hidden;
+}
+
+.file-menu-item {
+  display: flex;
+  align-items: center;
+  padding: 0.5rem 1rem;
+  font-size: 0.875rem;
+  color: var(--foreground);
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.file-menu-item:hover {
+  background-color: var(--accent);
+}
+
+.file-menu-item.danger {
+  color: var(--destructive);
+}
+
+.file-menu-item.danger:hover {
+  background-color: rgba(239, 68, 68, 0.1);
+}
+
+/* Loading state */
+.loading-spinner {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
