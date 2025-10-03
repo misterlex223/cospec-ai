@@ -107,6 +107,328 @@ app.use(cors());
 app.use(express.json());
 app.use(morgan('dev'));
 
+// 健康檢查端點
+app.get('/api/health', (req, res) => {
+  res.json({ status: 'ok', timestamp: Date.now() });
+});
+
+// 模擬的認證 API
+const mockUsers = [
+  {
+    id: '1',
+    username: 'testuser',
+    email: 'test@example.com',
+    password: 'password',
+    created_at: Date.now() - 86400000,
+    updated_at: Date.now() - 86400000
+  }
+];
+
+const mockPersonalOrg = {
+  id: 'personal-1',
+  name: 'Test User\'s Personal Space',
+  slug: 'testuser-personal',
+  settings: {
+    isPersonal: true,
+    owner: '1'
+  },
+  role: 'owner',
+  created_at: Date.now() - 86400000,
+  updated_at: Date.now() - 86400000
+};
+
+// 登入 API
+app.post('/api/auth/login', (req, res) => {
+  const { email, password } = req.body;
+  const user = mockUsers.find(u => u.email === email && u.password === password);
+  
+  if (user) {
+    // 創建一個簡單的模擬令牌
+    const token = Buffer.from(`${user.id}:${Date.now()}`).toString('base64');
+    
+    // 返回用戶信息和令牌
+    res.json({
+      user: { ...user, password: undefined },
+      personalOrganization: mockPersonalOrg,
+      token
+    });
+  } else {
+    res.status(401).json({ error: '無效的電子郵件或密碼' });
+  }
+});
+
+// 註冊 API
+app.post('/api/auth/register', (req, res) => {
+  const { username, email, password } = req.body;
+  
+  // 檢查電子郵件是否已存在
+  if (mockUsers.some(u => u.email === email)) {
+    return res.status(409).json({ error: '電子郵件已被使用' });
+  }
+  
+  // 創建新用戶
+  const newUser = {
+    id: String(mockUsers.length + 1),
+    username,
+    email,
+    password,
+    created_at: Date.now(),
+    updated_at: Date.now()
+  };
+  
+  mockUsers.push(newUser);
+  
+  // 創建個人空間
+  const personalOrg = {
+    id: `personal-${newUser.id}`,
+    name: `${username}'s Personal Space`,
+    slug: `${username.toLowerCase()}-personal`,
+    settings: {
+      isPersonal: true,
+      owner: newUser.id
+    },
+    role: 'owner',
+    created_at: Date.now(),
+    updated_at: Date.now()
+  };
+  
+  // 創建令牌
+  const token = Buffer.from(`${newUser.id}:${Date.now()}`).toString('base64');
+  
+  // 返回用戶信息和令牌
+  res.status(201).json({
+    user: { ...newUser, password: undefined },
+    personalOrganization: personalOrg,
+    token
+  });
+});
+
+// 獲取當前用戶信息
+app.get('/api/auth/me', (req, res) => {
+  const authHeader = req.headers.authorization;
+  
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return res.status(401).json({ error: '無效的認證令牌' });
+  }
+  
+  const token = authHeader.split(' ')[1];
+  
+  try {
+    // 解析令牌
+    const decoded = Buffer.from(token, 'base64').toString();
+    const userId = decoded.split(':')[0];
+    
+    // 尋找用戶
+    const user = mockUsers.find(u => u.id === userId);
+    
+    if (!user) {
+      return res.status(401).json({ error: '無效的用戶' });
+    }
+    
+    // 返回用戶信息
+    res.json({
+      user: { ...user, password: undefined },
+      personalOrganization: mockPersonalOrg
+    });
+  } catch (err) {
+    res.status(401).json({ error: '無效的令牌格式' });
+  }
+});
+
+// 模擬的專案數據
+const mockProjects = [
+  {
+    id: 'project-1',
+    name: 'Sample Project',
+    slug: 'sample-project',
+    description: '這是一個樣本專案',
+    role: 'owner',
+    created_at: Date.now() - 86400000,
+    updated_at: Date.now() - 3600000,
+    github_repo: 'user/sample-repo',
+    github_branch: 'main'
+  },
+  {
+    id: 'project-2',
+    name: 'Documentation',
+    slug: 'documentation',
+    description: '專案文檔',
+    role: 'owner',
+    created_at: Date.now() - 172800000,
+    updated_at: Date.now() - 7200000
+  }
+];
+
+// 模擬的文件數據
+const mockFiles = [
+  {
+    id: 'file-1',
+    name: 'README.md',
+    path: '',
+    content: '# Sample Project\n\nThis is a sample project for testing purposes.\n\n## Features\n\n- Feature 1\n- Feature 2\n- Feature 3',
+    size: 120,
+    created_at: Date.now() - 86400000,
+    updated_at: Date.now() - 3600000
+  },
+  {
+    id: 'file-2',
+    name: 'CONTRIBUTING.md',
+    path: '',
+    content: '# Contributing Guidelines\n\nThank you for your interest in contributing to this project!\n\n## How to Contribute\n\n1. Fork the repository\n2. Create a new branch\n3. Make your changes\n4. Submit a pull request',
+    size: 180,
+    created_at: Date.now() - 172800000,
+    updated_at: Date.now() - 7200000
+  },
+  {
+    id: 'file-3',
+    name: 'api.md',
+    path: 'docs',
+    content: '# API Documentation\n\n## Endpoints\n\n### GET /api/v1/users\n\nReturns a list of users.\n\n### POST /api/v1/users\n\nCreates a new user.',
+    size: 150,
+    created_at: Date.now() - 259200000,
+    updated_at: Date.now() - 10800000
+  }
+];
+
+// 驗證令牌中間件
+const authenticateToken = (req, res, next) => {
+  const authHeader = req.headers.authorization;
+  
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return res.status(401).json({ error: '無效的認證令牌' });
+  }
+  
+  const token = authHeader.split(' ')[1];
+  
+  try {
+    // 解析令牌
+    const decoded = Buffer.from(token, 'base64').toString();
+    const userId = decoded.split(':')[0];
+    
+    // 尋找用戶
+    const user = mockUsers.find(u => u.id === userId);
+    
+    if (!user) {
+      return res.status(401).json({ error: '無效的用戶' });
+    }
+    
+    // 將用戶信息添加到請求對象
+    req.user = { ...user, password: undefined };
+    next();
+  } catch (err) {
+    res.status(401).json({ error: '無效的令牌格式' });
+  }
+};
+
+// 獲取個人空間專案列表
+app.get('/api/personal-space/projects', authenticateToken, (req, res) => {
+  res.json({ projects: mockProjects });
+});
+
+// 獲取用戶的組織列表
+app.get('/api/auth/me/organizations', authenticateToken, (req, res) => {
+  // 只返回個人空間作為組織
+  res.json({ organizations: [mockPersonalOrg] });
+});
+
+// 獲取組織列表
+app.get('/api/organizations', authenticateToken, (req, res) => {
+  // 只返回個人空間作為組織
+  res.json({ organizations: [mockPersonalOrg] });
+});
+
+// 創建新專案
+app.post('/api/personal-space/projects', authenticateToken, (req, res) => {
+  const { name, settings = {} } = req.body;
+  
+  if (!name) {
+    return res.status(400).json({ error: '專案名稱是必需的' });
+  }
+  
+  const newProject = {
+    id: `project-${Date.now()}`,
+    name,
+    slug: name.toLowerCase().replace(/\s+/g, '-'),
+    description: '',
+    role: 'owner',
+    created_at: Date.now(),
+    updated_at: Date.now(),
+    ...settings
+  };
+  
+  mockProjects.push(newProject);
+  
+  res.status(201).json(newProject);
+});
+
+// 獲取專案詳情
+app.get('/api/projects/:projectId', authenticateToken, (req, res) => {
+  const project = mockProjects.find(p => p.id === req.params.projectId);
+  
+  if (!project) {
+    return res.status(404).json({ error: '專案不存在' });
+  }
+  
+  res.json(project);
+});
+
+// 獲取專案文件列表
+app.get('/api/projects/:projectId/files', authenticateToken, (req, res) => {
+  const project = mockProjects.find(p => p.id === req.params.projectId);
+  
+  if (!project) {
+    return res.status(404).json({ error: '專案不存在' });
+  }
+  
+  res.json({ files: mockFiles });
+});
+
+// 獲取文件詳情
+app.get('/api/projects/:projectId/files/:fileId', authenticateToken, (req, res) => {
+  const project = mockProjects.find(p => p.id === req.params.projectId);
+  
+  if (!project) {
+    return res.status(404).json({ error: '專案不存在' });
+  }
+  
+  const file = mockFiles.find(f => f.id === req.params.fileId);
+  
+  if (!file) {
+    return res.status(404).json({ error: '文件不存在' });
+  }
+  
+  res.json(file);
+});
+
+// 更新文件內容
+app.put('/api/projects/:projectId/files/:fileId', authenticateToken, (req, res) => {
+  const { content } = req.body;
+  
+  if (content === undefined) {
+    return res.status(400).json({ error: '內容是必需的' });
+  }
+  
+  const project = mockProjects.find(p => p.id === req.params.projectId);
+  
+  if (!project) {
+    return res.status(404).json({ error: '專案不存在' });
+  }
+  
+  const fileIndex = mockFiles.findIndex(f => f.id === req.params.fileId);
+  
+  if (fileIndex === -1) {
+    return res.status(404).json({ error: '文件不存在' });
+  }
+  
+  mockFiles[fileIndex] = {
+    ...mockFiles[fileIndex],
+    content,
+    updated_at: Date.now()
+  };
+  
+  res.json(mockFiles[fileIndex]);
+});
+
 // 功能項目: 2.1.3 監控文件變更
 let watcher;
 
@@ -349,7 +671,7 @@ app.post('/api/files/refresh', async (req, res) => {
 });
 
 // 功能項目: 2.2.1 讀取文件內容
-app.get('/api/files/:path(*)', async (req, res) => {
+app.get('/api/files/:path', async (req, res) => {
   try {
     const filePath = path.join(MARKDOWN_DIR, req.params.path);
     
@@ -368,7 +690,7 @@ app.get('/api/files/:path(*)', async (req, res) => {
 });
 
 // 功能項目: 2.2.2 保存文件內容
-app.post('/api/files/:path(*)', async (req, res) => {
+app.post('/api/files/:path', async (req, res) => {
   try {
     const { content } = req.body;
     if (content === undefined) {
@@ -390,7 +712,7 @@ app.post('/api/files/:path(*)', async (req, res) => {
 });
 
 // 功能項目: 2.2.3 創建新文件
-app.put('/api/files/:path(*)', async (req, res) => {
+app.put('/api/files/:path', async (req, res) => {
   try {
     const { content = '' } = req.body;
     const filePath = path.join(MARKDOWN_DIR, req.params.path);
@@ -416,7 +738,7 @@ app.put('/api/files/:path(*)', async (req, res) => {
 });
 
 // 功能項目: 2.2.4 刪除文件
-app.delete('/api/files/:path(*)', async (req, res) => {
+app.delete('/api/files/:path', async (req, res) => {
   try {
     const filePath = path.join(MARKDOWN_DIR, req.params.path);
     
@@ -435,7 +757,7 @@ app.delete('/api/files/:path(*)', async (req, res) => {
 });
 
 // 功能項目: 2.2.5 重命名文件
-app.patch('/api/files/:path(*)', async (req, res) => {
+app.patch('/api/files/:path', async (req, res) => {
   try {
     const { newPath } = req.body;
     if (!newPath) {

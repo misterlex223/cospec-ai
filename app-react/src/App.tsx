@@ -1,7 +1,5 @@
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { EditorPage } from './pages/EditorPage';
-import OrganizationList from './components/OrganizationList';
-import ProjectList from './components/ProjectList/ProjectList';
 import ProjectFiles from './components/ProjectFiles/ProjectFiles';
 import FileEditor from './components/FileEditor/FileEditor';
 import ApiTest from './components/ApiTest';
@@ -41,12 +39,12 @@ function App() {
           {/* 組織路由（向後兼容） */}
           <Route path="/organizations" element={
             <ProtectedRoute>
-              <OrganizationList />
+              <Navigate to="/personal-space" replace />
             </ProtectedRoute>
           } />
           <Route path="/organizations/:orgId" element={
             <ProtectedRoute>
-              <ProjectList />
+              <Navigate to="/personal-space" replace />
             </ProtectedRoute>
           } />
           

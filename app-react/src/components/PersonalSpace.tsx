@@ -8,6 +8,7 @@ import { Input } from './ui/input';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from './ui/card';
 import { Alert, AlertDescription } from './ui/alert';
 import { Badge } from './ui/badge';
+import { Label } from './ui/label';
 import Navigation from './Navigation/Navigation';
 import { toast } from 'sonner';
 
@@ -127,8 +128,10 @@ export default function PersonalSpace() {
             <CardContent>
               <form onSubmit={(e) => { e.preventDefault(); createProject(); }} className="space-y-4">
                 <div className="space-y-2">
+                  <Label htmlFor="project-name">專案名稱</Label>
                   <Input
-                    placeholder="專案名稱"
+                    id="project-name"
+                    placeholder="輸入專案名稱"
                     value={newProjectName}
                     onChange={(e) => setNewProjectName(e.target.value)}
                     disabled={creating}
