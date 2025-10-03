@@ -1,15 +1,79 @@
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { EditorPage } from './pages/EditorPage';
+import OrganizationList from './components/OrganizationList';
+import ProjectList from './components/ProjectList';
+import ProjectFiles from './components/ProjectFiles';
+import FileEditor from './components/FileEditor';
+import ApiTest from './components/ApiTest';
+import LoginPage from './components/auth/LoginPage';
+import RegisterPage from './components/auth/RegisterPage';
+import { AuthProvider } from './components/auth/AuthContext';
+import ProtectedRoute from './components/auth/ProtectedRoute';
+import PersonalSpace from './components/PersonalSpace';
 
 function App() {
   return (
     <Router>
-      <Routes>
-        <Route path="/" element={<Navigate to="/edit" replace />} />
-        <Route path="/edit" element={<EditorPage />} />
-        {/* Add a catch-all route for unescaped paths */}
-        <Route path="/edit/*" element={<EditorPage />} />
-      </Routes>
+      <AuthProvider>
+        <Routes>
+          {/* Auth routes */}
+          <Route path="/login" element={<LoginPage />} />
+          <Route path="/register" element={<RegisterPage />} />
+          
+          {/* Legacy routes */}
+          <Route path="/edit" element={<EditorPage />} />
+          <Route path="/edit/*" element={<EditorPage />} />
+          
+          {/* Protected SaaS routes */}
+          <Route path="/" element={<Navigate to="/personal-space" replace />} />
+          
+          {/* 個人空間路由 */}
+          <Route path="/personal-space" element={
+            <ProtectedRoute>
+              <PersonalSpace />
+            </ProtectedRoute>
+          } />
+          
+          {/* 組織路由（向後兼容） */}
+          <Route path="/organizations" element={
+            <ProtectedRoute>
+              <OrganizationList />
+            </ProtectedRoute>
+          } />
+          <Route path="/organizations/:orgId" element={
+            <ProtectedRoute>
+              <ProjectList />
+            </ProtectedRoute>
+          } />
+          
+          {/* 專案路由 */}
+          <Route path="/projects" element={
+            <ProtectedRoute>
+              <Navigate to="/personal-space" replace />
+            </ProtectedRoute>
+          } />
+          <Route path="/projects/:projectId" element={
+            <ProtectedRoute>
+              <ProjectFiles />
+            </ProtectedRoute>
+          } />
+          
+          {/* 目錄路由 */}
+          <Route path="/projects/:projectId/directory/*" element={
+            <ProtectedRoute>
+              <ProjectFiles />
+            </ProtectedRoute>
+          } />
+          
+          {/* 文件編輯路由 */}
+          <Route path="/projects/:projectId/files/:fileId" element={
+            <ProtectedRoute>
+              <FileEditor />
+            </ProtectedRoute>
+          } />
+          <Route path="/api-test" element={<ApiTest />} />
+        </Routes>
+      </AuthProvider>
     </Router>
   );
 }

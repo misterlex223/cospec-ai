@@ -1,0 +1,25 @@
+[
+  {
+    "id": "e302fa61-1f98-4486-91a9-d535542cd78a",
+    "name": "Test Organization",
+    "slug": "test-organization",
+    "settings": {
+      "description": "Test Organization"
+    },
+    "role": "owner",
+    "created_at": 1759434724367,
+    "updated_at": 1759434724367
+  },
+  {
+    "id": "a8921377-59ce-42a7-92b7-9036f310b618",
+    "name": "Personal Space",
+    "slug": "misterlex-personal",
+    "settings": {
+      "isPersonal": true,
+      "owner": "9223d3d3-5914-43e3-9926-8d86c1162d3c"
+    },
+    "role": "owner",
+    "created_at": 1759475604527,
+    "updated_at": 1759475604527
+  }
+]

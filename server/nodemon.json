@@ -1,0 +1,13 @@
+{
+  "watch": ["*.js", "api/**/*.js", "data/**/*.json"],
+  "ignore": ["node_modules", ".git"],
+  "ext": "js,json",
+  "delay": "500",
+  "verbose": true,
+  "env": {
+    "NODE_ENV": "development"
+  },
+  "execMap": {
+    "js": "node"
+  }
+}

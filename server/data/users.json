@@ -1,0 +1,11 @@
+[
+  {
+    "id": "9223d3d3-5914-43e3-9926-8d86c1162d3c",
+    "username": "misterlex",
+    "email": "misterlex223@gmail.com",
+    "password_hash": "c2ff8c4832aff4a3aae5bc5a82908441e1e90eb293e296e3153a4cf9cd9f21a8d9c3ac482314cd42c146fe57a9a1b06f1171d47eb753fa0f095bae26f8245627",
+    "password_salt": "54478a8546dd0c14c9ef1b8bc06f4f22",
+    "created_at": 1759475604526,
+    "updated_at": 1759475604526
+  }
+]

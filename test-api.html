@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>API Test</title>
+  <script>
+    async function testGet() {
+      try {
+        const response = await fetch('http://localhost:3001/api/organizations', {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+            'Access-Control-Allow-Origin': '*'
+          }
+        });
+        const data = await response.json();
+        document.getElementById('get-result').textContent = JSON.stringify(data, null, 2);
+      } catch (error) {
+        document.getElementById('get-result').textContent = 'Error: ' + error.message;
+      }
+    }
+
+    async function testPost() {
+      try {
+        const name = document.getElementById('org-name').value;
+        const response = await fetch('http://localhost:3001/api/organizations', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Access-Control-Allow-Origin': '*'
+          },
+          body: JSON.stringify({
+            name: name,
+            settings: {}
+          })
+        });
+        const data = await response.json();
+        document.getElementById('post-result').textContent = JSON.stringify(data, null, 2);
+      } catch (error) {
+        document.getElementById('post-result').textContent = 'Error: ' + error.message;
+      }
+    }
+  </script>
+</head>
+<body>
+  <h1>API Test</h1>
+  
+  <h2>GET /api/organizations</h2>
+  <button onclick="testGet()">Test GET</button>
+  <pre id="get-result"></pre>
+  
+  <h2>POST /api/organizations</h2>
+  <input type="text" id="org-name" placeholder="Organization Name">
+  <button onclick="testPost()">Test POST</button>
+  <pre id="post-result"></pre>
+</body>
+</html>

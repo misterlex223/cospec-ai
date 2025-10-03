@@ -5,16 +5,20 @@ set -e
 
 echo "開始部署 CoSpec 到 Staging 環境..."
 
-# 1. 創建 Staging 資源
-echo "創建 Staging 資源..."
-echo "創建 D1 數據庫..."
-npx wrangler d1 create cospec-db-staging
+# 1. 創建或驗證 Staging 資源
+echo "創建或驗證 Staging 資源..."
 
-echo "創建 R2 存儲桶..."
-npx wrangler r2 bucket create cospec-storage-staging
+# 創建 D1 數據庫（如果不存在）
+echo "創建或驗證 D1 數據庫..."
+npx wrangler d1 create cospec-db-staging 2>/dev/null || echo "D1 數據庫已存在，繼續使用現有數據庫"
 
-echo "創建 Dispatch Namespace..."
-npx wrangler dispatch-namespace create cospec-namespace-staging
+# 創建 R2 存儲桶（如果不存在）
+echo "創建或驗證 R2 存儲桶..."
+npx wrangler r2 bucket create cospec-storage-staging 2>/dev/null || echo "R2 存儲桶已存在，繼續使用現有存儲桶"
+
+# 創建 Dispatch Namespace（如果不存在）
+echo "創建或驗證 Dispatch Namespace..."
+npx wrangler dispatch-namespace create cospec-namespace-staging 2>/dev/null || echo "Dispatch Namespace 已存在，繼續使用現有 Namespace"
 
 # 2. 更新 wrangler.toml 中的資源 ID
 echo "更新 wrangler.toml 中的資源 ID..."

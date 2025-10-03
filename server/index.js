@@ -15,6 +15,13 @@ try {
   console.warn('glob-gitignore not available, falling back to standard glob');
 }
 
+// 引入組織和項目 API 路由
+const organizationsRouter = require('./api/organizations');
+// 引入用戶認證 API 路由
+const { router: usersRouter, authenticate } = require('./api/users');
+// 引入個人空間和目錄管理 API 路由
+const personalSpaceRouter = require('./api/personal-space');
+
 const app = express();
 const server = http.createServer(app);
 const PORT = process.env.PORT || 3001;
@@ -103,9 +110,23 @@ function broadcastToClients(message) {
 const MARKDOWN_DIR = process.env.MARKDOWN_DIR || '/markdown';
 
 // 中間件
-app.use(cors());
+app.use(cors({
+  origin: '*',
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'Access-Control-Allow-Origin']
+}));
+
+// 添加 CORS 預檢請求處理
+app.options('*', cors());
 app.use(express.json());
 app.use(morgan('dev'));
+
+// 使用組織和項目 API 路由
+app.use('/api', organizationsRouter);
+// 使用用戶認證 API 路由
+app.use('/api/auth', usersRouter);
+// 使用個人空間和目錄管理 API 路由
+app.use('/api', personalSpaceRouter);
 
 // 功能項目: 2.1.3 監控文件變更
 let watcher;

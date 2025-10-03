@@ -1,0 +1,10 @@
+[site]
+bucket = "./dist"
+pages_build_output_dir = "dist"
+
+[dev]
+port = 8789
+
+[[routes]]
+pattern = "/api/*"
+forward = "http://localhost:3001"
