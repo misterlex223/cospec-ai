@@ -22,7 +22,7 @@ COPY app-react/*.cjs ./
 
 # 複製後端源碼
 WORKDIR /server
-COPY app/server/ ./
+COPY server/ ./
 RUN npm install
 
 # 設置環境變數
