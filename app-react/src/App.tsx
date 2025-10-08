@@ -36,18 +36,6 @@ function App() {
             </ProtectedRoute>
           } />
           
-          {/* 組織路由（向後兼容） */}
-          <Route path="/organizations" element={
-            <ProtectedRoute>
-              <Navigate to="/personal-space" replace />
-            </ProtectedRoute>
-          } />
-          <Route path="/organizations/:orgId" element={
-            <ProtectedRoute>
-              <Navigate to="/personal-space" replace />
-            </ProtectedRoute>
-          } />
-          
           {/* 專案路由 */}
           <Route path="/projects" element={
             <ProtectedRoute>
