@@ -600,6 +600,7 @@ app.patch('/api/files/:path(*)', authenticateToken, async (req, res) => {
 
 // AI 功能 API 端點
 const { Configuration, OpenAIApi } = require('openai');
+const { functionRegistry } = require('./functionRegistry');
 
 // 初始化 OpenAI 配置
 let openai;
@@ -618,7 +619,20 @@ if (OPENAI_API_KEY) {
   console.warn('Warning: OPENAI_API_KEY not found. AI features will use mock responses.');
 }
 
-// AI 聊天端點
+// Function to get function definitions for OpenAI
+function getFunctionDefinitions() {
+  const functions = [];
+  for (const [name, func] of Object.entries(functionRegistry)) {
+    functions.push({
+      name: name,
+      description: func.description,
+      parameters: func.parameters
+    });
+  }
+  return functions;
+}
+
+// AI 聊天端點 with function calling support
 app.post('/api/ai/chat', async (req, res) => {
   try {
     const { message, context, filePath, conversation, systemPrompt } = req.body;
@@ -631,23 +645,27 @@ app.post('/api/ai/chat', async (req, res) => {
     if (!openai) {
       // 模擬 AI 回應
       const mockResponse = {
-        response: `這是一個模擬的 AI 回應。您剛剛問道：「${message}」\n\n如果配置了 OpenAI API 密鑰，您將獲得實際的 AI 分析結果。`,
+        response: `這是一個模擬的 AI 回應。您剛剛問道：「${message}」\n\n如果配置了 OpenAI API 密鑰，您將獲得實際的 AI 分析結果。\n\n可用工具: ${Object.keys(functionRegistry).join(', ')}`,
         updatedContent: null
       };
       return res.json(mockResponse);
     }
 
     // 構建對話歷史
-    let defaultSystemPrompt = `你是一個 Markdown 文件編輯助手。你可以幫助用戶總結、重寫、格式化 Markdown 文件，回答有關文件內容的問題，以及提供其他文本相關的幫助。當前編輯的文件是 ${filePath || '未指定'}。文件內容是：\n\n${context || '無內容'}`;
+    let defaultSystemPrompt = `你是一個 Markdown 文件編輯助手。你可以幫助用戶總結、重寫、格式化 Markdown 文件，回答有關文件內容的問題，以及提供其他文本相關的幫助。當前編輯的文件是 ${filePath || '未指定'}。文件內容是：\n\n${context || '無內容'}\n\n你可以使用以下工具來幫助用戶：${Object.keys(functionRegistry).join(', ')}\n\n請在需要時使用合適的工具來完成任務。`;
 
     // 如果提供了自定義系統提示詞，則使用它，否則使用默認的
     let systemContent = systemPrompt || defaultSystemPrompt;
 
+    // Get function definitions for OpenAI
+    const functions = getFunctionDefinitions();
+
+    // Build initial conversation history
     let conversationHistory = [
       { role: 'system', content: systemContent }
     ];
 
-    // 添加之前的對話歷史（最多保留最近的 10 條消息）
+    // Add previous conversation history (up to 10 most recent messages)
     if (conversation && Array.isArray(conversation)) {
       const recentConversations = conversation.slice(-10).map(msg => ({
         role: msg.role === 'user' ? 'user' : 'assistant',
@@ -656,23 +674,76 @@ app.post('/api/ai/chat', async (req, res) => {
       conversationHistory = conversationHistory.concat(recentConversations);
     }
 
-    // 添加當前用戶消息
+    // Add current user message
     conversationHistory.push({ role: 'user', content: message });
 
-    // 調用 OpenAI API
+    // First API call to OpenAI with function definitions
     const response = await openai.createChatCompletion({
-      model: OPENAI_MODEL, // 使用環境變數指定的模型
+      model: OPENAI_MODEL,
       messages: conversationHistory,
+      functions: functions,
+      function_call: 'auto', // Allow model to decide when to call functions
       max_tokens: 1000,
       temperature: 0.7,
     });
 
-    const aiResponse = response.data.choices[0].message.content;
+    const choice = response.data.choices[0];
+    let aiResponse = '';
+    let updatedContent = null;
+    let toolCalls = [];
 
-    // 返回 AI 回應
+    if (choice.finish_reason === 'function_call') {
+      // Process function calls
+      const functionCall = choice.message.function_call;
+      const functionName = functionCall.name;
+      const functionArgs = JSON.parse(functionCall.arguments);
+
+      // Verify the function exists in our registry
+      if (!functionRegistry[functionName]) {
+        return res.status(400).json({ error: `Unknown function: ${functionName}` });
+      }
+
+      // Execute the function
+      const functionResult = await functionRegistry[functionName].implementation(functionArgs);
+
+      // Add function call and result to conversation history
+      conversationHistory.push(choice.message);
+      conversationHistory.push({
+        role: 'function',
+        name: functionName,
+        content: JSON.stringify(functionResult)
+      });
+
+      // Make a second call to get the final response after function execution
+      const secondResponse = await openai.createChatCompletion({
+        model: OPENAI_MODEL,
+        messages: conversationHistory,
+        max_tokens: 1000,
+        temperature: 0.7,
+      });
+
+      aiResponse = secondResponse.data.choices[0].message.content;
+
+      // Check if the function modified content that should be returned
+      if (functionResult.success && (functionName === 'write_file' || functionName === 'create_file')) {
+        updatedContent = functionArgs.content || null;
+      }
+
+      toolCalls.push({
+        function: functionName,
+        arguments: functionArgs,
+        result: functionResult
+      });
+    } else {
+      // No function call was made, return normal response
+      aiResponse = choice.message.content || '';
+    }
+
+    // Return AI response
     res.json({
       response: aiResponse,
-      updatedContent: null // 這個端點不直接修改內容，而是讓用戶決定是否使用 AI 的建議
+      updatedContent: updatedContent,
+      toolCalls: toolCalls // Include tool call information for the frontend
     });
   } catch (error) {
     console.error('Error in AI chat:', error);

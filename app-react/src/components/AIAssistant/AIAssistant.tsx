@@ -8,11 +8,18 @@ interface AIAssistantProps {
   onContentUpdate: (newContent: string) => void;
 }
 
+interface ToolCall {
+  function: string;
+  arguments: any;
+  result: any;
+}
+
 interface Message {
   id: string;
   role: 'user' | 'assistant';
   content: string;
   timestamp: Date;
+  toolCalls?: ToolCall[];
 }
 
 export function AIAssistant({ currentContent, onContentUpdate }: AIAssistantProps) {
@@ -74,6 +81,7 @@ export function AIAssistant({ currentContent, onContentUpdate }: AIAssistantProp
         role: 'assistant',
         content: data.response,
         timestamp: new Date(),
+        toolCalls: data.toolCalls || [] // Include tool calls if available
       };
 
       setMessages(prev => [...prev, aiMessage]);
@@ -268,6 +276,20 @@ export function AIAssistant({ currentContent, onContentUpdate }: AIAssistantProp
                   <li>回答關於文件的問題</li>
                 </ul>
 
+                <div style={{ marginTop: '20px', textAlign: 'left', fontSize: '13px' }}>
+                  <h4>可用工具：</h4>
+                  <ul style={{ paddingInlineStart: '20px', marginTop: '8px' }}>
+                    <li><strong>list_files</strong>: 列出所有 Markdown 文件</li>
+                    <li><strong>read_file</strong>: 讀取特定文件內容</li>
+                    <li><strong>write_file</strong>: 寫入內容到文件</li>
+                    <li><strong>create_file</strong>: 創建新文件</li>
+                    <li><strong>delete_file</strong>: 刪除文件</li>
+                    <li><strong>search_content</strong>: 搜尋內容</li>
+                    <li><strong>get_requirements</strong>: 提取需求資訊</li>
+                    <li><strong>get_system_design</strong>: 提取系統設計元件</li>
+                  </ul>
+                </div>
+
                 <div style={{ marginTop: '20px' }}>
                   <h4>快速功能：</h4>
                   <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginTop: '10px' }}>
@@ -432,7 +454,32 @@ export function AIAssistant({ currentContent, onContentUpdate }: AIAssistantProp
                       }}
                     >
                       {message.role === 'assistant' ? (
-                        <ReactMarkdown>{message.content}</ReactMarkdown>
+                        <>
+                          <ReactMarkdown>{message.content}</ReactMarkdown>
+                          {/* Display tool calls if they exist */}
+                          {message.toolCalls && message.toolCalls.length > 0 && (
+                            <div style={{
+                              marginTop: '8px',
+                              paddingTop: '8px',
+                              borderTop: '1px solid #e5e7eb',
+                              fontSize: '12px'
+                            }}>
+                              <strong>工具使用:</strong>
+                              {message.toolCalls.map((toolCall, index) => (
+                                <div key={index} style={{ marginTop: '4px', backgroundColor: '#f3f4f6', padding: '4px', borderRadius: '4px' }}>
+                                  <div><strong>{toolCall.function}</strong> 使用了</div>
+                                  <details style={{ marginTop: '4px' }}>
+                                    <summary style={{ cursor: 'pointer', fontSize: '11px', color: '#6b7280' }}>查看詳情</summary>
+                                    <div style={{ fontSize: '10px', marginTop: '4px' }}>
+                                      <div><strong>參數:</strong> {JSON.stringify(toolCall.arguments, null, 2)}</div>
+                                      <div><strong>結果:</strong> {JSON.stringify(toolCall.result, null, 2)}</div>
+                                    </div>
+                                  </details>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </>
                       ) : (
                         <div style={{ whiteSpace: 'pre-wrap' }}>{message.content}</div>
                       )}
