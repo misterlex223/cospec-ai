@@ -601,6 +601,8 @@ app.patch('/api/files/:path(*)', authenticateToken, async (req, res) => {
 // AI 功能 API 端點
 const { Configuration, OpenAIApi } = require('openai');
 const { functionRegistry } = require('./functionRegistry');
+const Mem0Service = require('./mem0Service');
+const mem0Service = new Mem0Service();
 
 // 初始化 OpenAI 配置
 let openai;
@@ -641,6 +643,18 @@ app.post('/api/ai/chat', async (req, res) => {
       return res.status(400).json({ error: 'Message is required' });
     }
 
+    // 檢索與當前對話相關的記憶
+    let memoryContext = '';
+    try {
+      const memories = await mem0Service.searchMemories(message, 5);
+      if (memories.results && memories.results.length > 0) {
+        memoryContext = '根據之前的記憶：\n' + memories.results.map(mem => `- ${mem.content}`).join('\n') + '\n\n';
+      }
+    } catch (memError) {
+      console.error('Error retrieving memories:', memError.message);
+      // 如果記憶檢索失敗，繼續執行而不中斷流程
+    }
+
     // 如果沒有配置 OpenAI API 密鑰，返回模擬回應
     if (!openai) {
       // 模擬 AI 回應
@@ -652,7 +666,12 @@ app.post('/api/ai/chat', async (req, res) => {
     }
 
     // 構建對話歷史
-    let defaultSystemPrompt = `你是一個 Markdown 文件編輯助手。你可以幫助用戶總結、重寫、格式化 Markdown 文件，回答有關文件內容的問題，以及提供其他文本相關的幫助。當前編輯的文件是 ${filePath || '未指定'}。文件內容是：\n\n${context || '無內容'}\n\n你可以使用以下工具來幫助用戶：${Object.keys(functionRegistry).join(', ')}\n\n請在需要時使用合適的工具來完成任務。`;
+    let defaultSystemPrompt = `你是一個 Markdown 文件編輯助手。你可以幫助用戶總結、重寫、格式化 Markdown 文件，回答有關文件內容的問題，以及提供其他文本相關的幫助。當前編輯的文件是 ${filePath || '未指定'}。文件內容是：\n\n${context || '無內容'}\n\n你可以使用以下工具來幫助用戶：${Object.keys(functionRegistry).join(', ')}\n\n請在需要時使用合適的工具來完成任務。}`;
+
+    // 加入記憶上下文
+    if (memoryContext) {
+      defaultSystemPrompt = memoryContext + defaultSystemPrompt;
+    }
 
     // 如果提供了自定義系統提示詞，則使用它，否則使用默認的
     let systemContent = systemPrompt || defaultSystemPrompt;
@@ -737,6 +756,27 @@ app.post('/api/ai/chat', async (req, res) => {
     } else {
       // No function call was made, return normal response
       aiResponse = choice.message.content || '';
+    }
+
+    // 將對話內容保存到記憶中
+    try {
+      // 保存用戶消息到記憶
+      await mem0Service.addCategorizedMemory(message, 'user_query', {
+        filePath: filePath,
+        timestamp: new Date().toISOString(),
+        conversationId: 'current'
+      });
+
+      // 保存AI回應到記憶
+      await mem0Service.addCategorizedMemory(aiResponse, 'assistant_response', {
+        filePath: filePath,
+        timestamp: new Date().toISOString(),
+        conversationId: 'current',
+        toolCalls: toolCalls
+      });
+    } catch (memError) {
+      console.error('Error saving memories:', memError.message);
+      // 如果記憶保存失敗，繼續執行而不中斷流程
     }
 
     // Return AI response

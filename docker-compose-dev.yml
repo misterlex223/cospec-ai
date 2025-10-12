@@ -1,8 +1,20 @@
-# CoSpec AI Development Docker Compose
+# CoSpec AI Development Docker Compose with mem0 integration
 # Usage: docker compose -f docker-compose-dev.yml up
 # Mounts source directories for live reloading during development
 
 services:
+  # PostgreSQL database with pgvector extension for mem0 (optional, for non-memory vector store)
+  mem0-db-dev:
+    image: ankane/pgvector:latest
+    container_name: mem0-postgres-dev
+    environment:
+      POSTGRES_DB: mem0
+      POSTGRES_USER: mem0user
+      POSTGRES_PASSWORD: mem0pass
+    volumes:
+      - mem0_postgres_data_dev:/var/lib/postgresql/data
+    restart: unless-stopped
+
   cospec-ai-app-dev:
     build:
       context: .
@@ -23,4 +35,19 @@ services:
       - OPENAI_API_KEY=${OPENAI_API_KEY:-}
       - OPENAI_BASE_URL=${OPENAI_BASE_URL:-https://api.openai.com/v1}
       - OPENAI_MODEL=${OPENAI_MODEL:-gpt-3.5-turbo}
+      - MEM0_API_KEY=${MEM0_API_KEY:-}
+      - MEM0_USER_ID=${MEM0_USER_ID:-default-user}
+      - MEM0_MODEL=${MEM0_MODEL:-gpt-3.5-turbo}
+      - EMBEDDER_MODEL=text-embedding-v4
+      - VECTOR_STORE_PROVIDER=${VECTOR_STORE_PROVIDER:-memory}
+      - PGVECTOR_HOST=mem0-db-dev
+      - PGVECTOR_PORT=5432
+      - PGVECTOR_DATABASE=mem0
+      - PGVECTOR_USER=mem0user
+      - PGVECTOR_PASSWORD=mem0pass
+    depends_on:
+      - mem0-db-dev
     restart: unless-stopped
+
+volumes:
+  mem0_postgres_data_dev:

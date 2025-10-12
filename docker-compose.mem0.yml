@@ -1,0 +1,43 @@
+version: '3.8'
+
+services:
+  # PostgreSQL database for mem0
+  mem0-db:
+    image: ankane/pgvector:latest
+    container_name: mem0-postgres
+    environment:
+      POSTGRES_DB: mem0
+      POSTGRES_USER: mem0user
+      POSTGRES_PASSWORD: mem0pass
+    volumes:
+      - mem0_postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    networks:
+      - mem0-network
+    restart: unless-stopped
+
+  # Optional: Alternative local LLM service using Ollama
+  ollama:
+    image: ollama/ollama:latest
+    container_name: mem0-ollama
+    volumes:
+      - ollama_data:/root/.ollama
+    ports:
+      - "11434:11434"
+    networks:
+      - mem0-network
+    deploy:
+      resources:
+        limits:
+          # Uncomment the following lines if you want to limit resources
+          # memory: 4G
+    restart: unless-stopped
+
+networks:
+  mem0-network:
+    driver: bridge
+
+volumes:
+  mem0_postgres_data:
+  ollama_data:
