@@ -6,6 +6,8 @@ import 'vditor/dist/index.css';
 import { fileApi } from '../../services/api';
 import { cn } from '../../lib/utils';
 import { AIAssistant } from '../AIAssistant/AIAssistant';
+import { RequirementsView } from '../RequirementsView/RequirementsView';
+import { SystemDesignView } from '../SystemDesignView/SystemDesignView';
 import '../AIAssistant/AIAssistant.css';
 import './MarkdownEditorStyles.css';
 
@@ -89,8 +91,12 @@ export function MarkdownEditor({ filePath, className }: MarkdownEditorProps) {
     }
 
     try {
-      if (vditorRef.current) {
-        vditorRef.current.destroy();
+      if (vditorRef.current && vditorRef.current.element) {
+        try {
+          vditorRef.current.destroy();
+        } catch (error) {
+          console.warn('Error destroying Vditor instance:', error);
+        }
         vditorRef.current = null;
       }
 
@@ -298,8 +304,12 @@ export function MarkdownEditor({ filePath, className }: MarkdownEditorProps) {
 
     // 清理編輯器
     return () => {
-      if (vditorRef.current) {
-        vditorRef.current.destroy();
+      if (vditorRef.current && vditorRef.current.element) {
+        try {
+          vditorRef.current.destroy();
+        } catch (error) {
+          console.warn('Error destroying Vditor instance in cleanup:', error);
+        }
         vditorRef.current = null;
       }
     };
@@ -362,7 +372,7 @@ export function MarkdownEditor({ filePath, className }: MarkdownEditorProps) {
       </div>
 
       {/* 編輯器容器 - 確保工具欄可見 */}
-      <div className="flex-1 h-full relative">
+      <div className="flex-1 relative">
         {loading && (
           <div className="absolute inset-0 flex items-center justify-center bg-background/80 z-10">
             <div className="text-lg">Loading...</div>
@@ -377,13 +387,52 @@ export function MarkdownEditor({ filePath, className }: MarkdownEditorProps) {
         <div ref={editorRef} className="h-full w-full" style={{ position: 'relative', zIndex: 1 }} />
       </div>
 
+      {/* 系統設計和需求追蹤視圖容器 - 確保可見且有適當的滾動行為 */}
+      <div className="relative">
+        {/* System Design View - shown when editing system design files */}
+        <SystemDesignView
+          content={content}
+          onUpdateContent={(newContent) => {
+            setContent(newContent);
+            if (vditorRef.current && vditorRef.current.element) {
+              try {
+                vditorRef.current.setValue(newContent);
+              } catch (error) {
+                console.warn('Error setting Vditor value:', error);
+              }
+              saveContent(newContent); // 使用防抖保存
+            }
+          }}
+        />
+
+        {/* Requirements View - shown when editing requirements files */}
+        <RequirementsView
+          content={content}
+          onUpdateContent={(newContent) => {
+            setContent(newContent);
+            if (vditorRef.current && vditorRef.current.element) {
+              try {
+                vditorRef.current.setValue(newContent);
+              } catch (error) {
+                console.warn('Error setting Vditor value:', error);
+              }
+              saveContent(newContent); // 使用防抖保存
+            }
+          }}
+        />
+      </div>
+
       {/* AI 助理組件 */}
       <AIAssistant
         currentContent={content}
         onContentUpdate={(newContent) => {
           setContent(newContent);
-          if (vditorRef.current) {
-            vditorRef.current.setValue(newContent);
+          if (vditorRef.current && vditorRef.current.element) {
+            try {
+              vditorRef.current.setValue(newContent);
+            } catch (error) {
+              console.warn('Error setting Vditor value:', error);
+            }
             saveContent(newContent); // 使用防抖保存
           }
         }}

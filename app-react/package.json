@@ -7,9 +7,13 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test": "playwright test",
+    "test:ui": "playwright test --ui",
+    "test:report": "playwright show-report"
   },
   "dependencies": {
+    "@playwright/test": "^1.56.0",
     "@radix-ui/react-icons": "^1.3.2",
     "@radix-ui/react-slot": "^1.2.3",
     "@reduxjs/toolkit": "^2.2.1",

@@ -22,7 +22,7 @@ export function AIAssistant({ currentContent, onContentUpdate }: AIAssistantProp
   const [isLoading, setIsLoading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  const filePath = useSelector((state: RootState) => state.editor.currentFile);
+  const filePath = useSelector((state: RootState) => state.editor.filePath);
 
   // 自動滾動到最新消息
   useEffect(() => {

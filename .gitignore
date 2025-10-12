@@ -5,3 +5,5 @@ work/
 
 .wrangler/state/*
 figma-mocks/
+app-react/playwright-report/
+app-react/test-results/
