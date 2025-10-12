@@ -7,6 +7,7 @@ const morgan = require('morgan');
 const { glob } = require('glob');
 const chokidar = require('chokidar');
 const http = require('http');
+const { Server } = require('socket.io');
 // 引入 glob-gitignore 用於處理 .gitignore 過濾
 let globGitignore;
 try {
@@ -17,21 +18,13 @@ try {
 
 const app = express();
 const server = http.createServer(app);
-const PORT = process.env.PORT || 3001;
-
-// 創建簡易的 WebSocket 伺服器實現
-let wsClients = [];
-
-// 將 WebSocket 功能整合到 HTTP 伺服器
-server.on('upgrade', (request, socket, head) => {
-  const pathname = new URL(request.url, `http://${request.headers.host}`).pathname;
-  
-  if (pathname === '/ws') {
-    handleWebSocket(request, socket, head);
-  } else {
-    socket.destroy();
+const io = new Server(server, {
+  cors: {
+    origin: "*",
+    methods: ["GET", "POST"]
   }
 });
+const PORT = process.env.PORT || 3001;
 
 // 處理 WebSocket 連線
 function handleWebSocket(request, socket, head) {
@@ -42,7 +35,7 @@ function handleWebSocket(request, socket, head) {
     .createHash('sha1')
     .update(key + GUID)
     .digest('base64');
-    
+
   const headers = [
     'HTTP/1.1 101 Switching Protocols',
     'Upgrade: websocket',
@@ -50,15 +43,15 @@ function handleWebSocket(request, socket, head) {
     `Sec-WebSocket-Accept: ${acceptKey}`,
     '\r\n'
   ].join('\r\n');
-  
+
   socket.write(headers);
-  
+
   // 將客戶端添加到列表
   const client = { socket };
   wsClients.push(client);
-  
+
   console.log(`WebSocket client connected, total clients: ${wsClients.length}`);
-  
+
   // 處理客戶端關閉
   socket.on('close', () => {
     const index = wsClients.findIndex(c => c.socket === socket);
@@ -67,7 +60,7 @@ function handleWebSocket(request, socket, head) {
       console.log(`WebSocket client disconnected, remaining clients: ${wsClients.length}`);
     }
   });
-  
+
   // 處理錯誤
   socket.on('error', (err) => {
     console.error('WebSocket error:', err);
@@ -75,37 +68,72 @@ function handleWebSocket(request, socket, head) {
   });
 }
 
-// 向所有 WebSocket 客戶端發送消息
+// 向所有 Socket.io 客戶端發送消息
 function broadcastToClients(message) {
-  const data = JSON.stringify(message);
-  
-  // 簡易的 WebSocket 幾乎封裝
-  const frame = Buffer.alloc(data.length + 2);
-  frame[0] = 0x81; // 文本幾乎，結束幾乎
-  frame[1] = data.length; // 簡化處理，僅適用於小於 126 字節的消息
-  
-  for (let i = 0; i < data.length; i++) {
-    frame[i + 2] = data.charCodeAt(i);
-  }
-  
-  wsClients.forEach(client => {
-    try {
-      if (client.socket.writable) {
-        client.socket.write(frame);
-      }
-    } catch (err) {
-      console.error('Error sending WebSocket message:', err);
-    }
-  });
+  io.emit('file-change', message);
 }
 
 // 功能項目: 1.1.3 設定環境變數
 const MARKDOWN_DIR = process.env.MARKDOWN_DIR || '/markdown';
 
-// 中間件
+const rateLimit = require('express-rate-limit');
+const helmet = require('helmet');
+
+// 安全性中間件
+app.use(helmet()); // 添加多種安全頭部
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: '10mb' }));  // 限制請求體大小
 app.use(morgan('dev'));
+
+// 路由限制
+const limiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 100, // limit each IP to 100 requests per windowMs
+  message: 'Too many requests from this IP, please try again later.'
+});
+app.use('/api/', limiter);
+
+// 簡單的身份驗證中間件（演示用途，生產環境應使用更安全的方法）
+function authenticateToken(req, res, next) {
+  // 在實際應用中，您應該實現真正的 JWT 或會話驗證
+  // 這裡僅作為示例
+  const authHeader = req.headers['authorization'];
+
+  // 簡單的密鑰驗證（僅用於演示）
+  const validApiKey = process.env.API_KEY || 'demo-api-key';
+
+  if (!authHeader) {
+    return res.status(401).json({ error: 'Access denied. No token provided.' });
+  }
+
+  // 檢查格式: "Bearer <token>" 或直接是密鑰
+  const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7, authHeader.length) : authHeader;
+
+  if (token !== validApiKey) {
+    return res.status(403).json({ error: 'Invalid token.' });
+  }
+
+  next();
+}
+
+
+
+// 輸入驗證和路徑清理函數
+function sanitizePath(inputPath) {
+  // 解碼 URI 組件
+  try {
+    const decodedPath = decodeURIComponent(inputPath);
+    // 清理路徑，防止目錄遍歷
+    const normalizedPath = path.normalize(decodedPath);
+    // 確保路徑不以 .. 開頭或包含 ../ 模式
+    if (normalizedPath.includes('../') || normalizedPath.startsWith('..')) {
+      throw new Error('Invalid path: directory traversal detected');
+    }
+    return normalizedPath;
+  } catch (e) {
+    throw new Error('Invalid path: malformed URI');
+  }
+}
 
 // 功能項目: 2.1.3 監控文件變更
 let watcher;
@@ -138,14 +166,14 @@ const getFileList = async () => {
     const gitignorePath = path.join(MARKDOWN_DIR, '.gitignore');
     let hasGitignore = false;
     let files = [];
-    
+
     try {
       await fs.access(gitignorePath);
       hasGitignore = true;
     } catch (error) {
       console.log('No .gitignore file found for file list');
     }
-    
+
     // 使用 glob-gitignore 如果可用且有 .gitignore 文件
     if (globGitignore && hasGitignore) {
       try {
@@ -167,7 +195,7 @@ const getFileList = async () => {
       files = await glob(`${MARKDOWN_DIR}/**/*.md`, {
         ignore: [`${MARKDOWN_DIR}/**/node_modules/**`]
       });
-      
+
       // 如果有 .gitignore 文件但沒有 glob-gitignore，手動過濾
       if (hasGitignore) {
         const gitignoreContent = await fs.readFile(gitignorePath, 'utf-8');
@@ -175,10 +203,10 @@ const getFileList = async () => {
           .split('\n')
           .filter(line => line.trim() && !line.startsWith('#'))
           .map(pattern => pattern.trim());
-        
+
         files = files.filter(file => {
           const relativePath = path.relative(MARKDOWN_DIR, file);
-          
+
           for (const pattern of gitignorePatterns) {
             if (pattern.endsWith('/')) {
               if (relativePath.startsWith(pattern) || relativePath.includes('/' + pattern)) {
@@ -198,12 +226,12 @@ const getFileList = async () => {
               }
             }
           }
-          
+
           return true;
         });
       }
     }
-    
+
     // 將絕對路徑轉換為相對路徑
     const relativePaths = files.map(file => {
       const relativePath = path.relative(MARKDOWN_DIR, file);
@@ -212,13 +240,13 @@ const getFileList = async () => {
         name: path.basename(file)
       };
     });
-    
+
     // 更新緩存
     fileCache.files = relativePaths;
     fileCache.lastUpdated = Date.now();
     fileCache.isValid = true;
     fileCache.isInitialized = true;
-    
+
     console.log(`File cache updated with ${relativePaths.length} files`);
     return relativePaths;
   } catch (error) {
@@ -235,7 +263,7 @@ const setupWatcher = async () => {
   const gitignorePath = path.join(MARKDOWN_DIR, '.gitignore');
   let hasGitignore = false;
   let gitignoreContent = '';
-  
+
   try {
     await fs.access(gitignorePath);
     gitignoreContent = await fs.readFile(gitignorePath, 'utf-8');
@@ -244,7 +272,7 @@ const setupWatcher = async () => {
   } catch (error) {
     console.log('No .gitignore file found for watcher');
   }
-  
+
   const watchOptions = {
     persistent: true,
     ignored: [
@@ -252,7 +280,7 @@ const setupWatcher = async () => {
       '**/node_modules/**' // 忽略 node_modules 目錄
     ]
   };
-  
+
   // 如果有 .gitignore 文件，添加到忽略列表
   if (hasGitignore) {
     // 將 .gitignore 檔案內容轉換為 chokidar 可用的忽略模式
@@ -263,9 +291,9 @@ const setupWatcher = async () => {
         // 確保模式是相對於 MARKDOWN_DIR 的
         return pattern.startsWith('/') ? pattern.substring(1) : pattern;
       });
-    
+
     // 將模式添加到忽略列表
-    watchOptions.ignored = [...watchOptions.ignored, ...gitignorePatterns.map(p => `${MARKDOWN_DIR}/${p}`)]; 
+    watchOptions.ignored = [...watchOptions.ignored, ...gitignorePatterns.map(p => `${MARKDOWN_DIR}/${p}`)];
   }
 
   watcher = chokidar.watch(`${MARKDOWN_DIR}/**/*.md`, watchOptions);
@@ -277,7 +305,7 @@ const setupWatcher = async () => {
     .on('add', filePath => {
       console.log(`File ${filePath} has been added`);
       invalidateCache(); // 文件添加時使緩存失效
-      
+
       // 向所有客戶端發送文件更新通知
       broadcastToClients({
         type: 'FILE_ADDED',
@@ -288,7 +316,7 @@ const setupWatcher = async () => {
     .on('change', filePath => {
       console.log(`File ${filePath} has been changed`);
       // 文件內容變更不需要使緩存失效，因為文件列表沒變
-      
+
       // 向所有客戶端發送文件更新通知
       broadcastToClients({
         type: 'FILE_CHANGED',
@@ -299,7 +327,7 @@ const setupWatcher = async () => {
     .on('unlink', filePath => {
       console.log(`File ${filePath} has been removed`);
       invalidateCache(); // 文件刪除時使緩存失效
-      
+
       // 向所有客戶端發送文件更新通知
       broadcastToClients({
         type: 'FILE_DELETED',
@@ -307,7 +335,7 @@ const setupWatcher = async () => {
         timestamp: Date.now()
       });
     });
-    
+
   // 初始化緩存
   try {
     await getFileList();
@@ -337,7 +365,7 @@ app.get('/api/files', async (req, res) => {
 });
 
 // 添加緩存控制端點
-app.post('/api/files/refresh', async (req, res) => {
+app.post('/api/files/refresh', authenticateToken, async (req, res) => {
   try {
     invalidateCache();
     const files = await getFileList();
@@ -351,16 +379,31 @@ app.post('/api/files/refresh', async (req, res) => {
 // 功能項目: 2.2.1 讀取文件內容
 app.get('/api/files/:path(*)', async (req, res) => {
   try {
-    const filePath = path.join(MARKDOWN_DIR, req.params.path);
-    
+    // 驗證並清理路徑
+    const sanitizedPath = sanitizePath(req.params.path);
+
+    // 確保路徑是 markdown 文件
+    if (!sanitizedPath.toLowerCase().endsWith('.md')) {
+      return res.status(400).json({ error: 'Only markdown files are allowed' });
+    }
+
+    const filePath = path.join(MARKDOWN_DIR, sanitizedPath);
+
+    // 確保路徑在 MARKDOWN_DIR 內
+    const resolvedPath = path.resolve(filePath);
+    const resolvedMarkdownDir = path.resolve(MARKDOWN_DIR);
+    if (!resolvedPath.startsWith(resolvedMarkdownDir)) {
+      return res.status(400).json({ error: 'Invalid file path: outside allowed directory' });
+    }
+
     try {
       await fs.access(filePath);
     } catch (error) {
-      return res.status(404).json({ error: `File not found: ${req.params.path}` });
+      return res.status(404).json({ error: `File not found: ${sanitizedPath}` });
     }
 
     const content = await fs.readFile(filePath, 'utf-8');
-    res.json({ path: req.params.path, content });
+    res.json({ path: sanitizedPath, content });
   } catch (error) {
     console.error('Error reading file:', error);
     res.status(500).json({ error: error.message });
@@ -368,21 +411,46 @@ app.get('/api/files/:path(*)', async (req, res) => {
 });
 
 // 功能項目: 2.2.2 保存文件內容
-app.post('/api/files/:path(*)', async (req, res) => {
+app.post('/api/files/:path(*)', authenticateToken, async (req, res) => {
   try {
     const { content } = req.body;
     if (content === undefined) {
       return res.status(400).json({ error: 'Content is required' });
     }
 
-    const filePath = path.join(MARKDOWN_DIR, req.params.path);
-    
+    // 驗證內容類型
+    if (typeof content !== 'string') {
+      return res.status(400).json({ error: 'Content must be a string' });
+    }
+
+    // 限制內容大小 (例如 10MB)
+    if (Buffer.byteLength(content, 'utf8') > 10 * 1024 * 1024) {
+      return res.status(400).json({ error: 'Content too large' });
+    }
+
+    // 驗證並清理路徑
+    const sanitizedPath = sanitizePath(req.params.path);
+
+    // 確保路徑是 markdown 文件
+    if (!sanitizedPath.toLowerCase().endsWith('.md')) {
+      return res.status(400).json({ error: 'Only markdown files are allowed' });
+    }
+
+    const filePath = path.join(MARKDOWN_DIR, sanitizedPath);
+
+    // 確保路徑在 MARKDOWN_DIR 內
+    const resolvedPath = path.resolve(filePath);
+    const resolvedMarkdownDir = path.resolve(MARKDOWN_DIR);
+    if (!resolvedPath.startsWith(resolvedMarkdownDir)) {
+      return res.status(400).json({ error: 'Invalid file path: outside allowed directory' });
+    }
+
     // 確保目錄存在
     const dirPath = path.dirname(filePath);
     await fs.mkdir(dirPath, { recursive: true });
-    
+
     await fs.writeFile(filePath, content, 'utf-8');
-    res.json({ success: true, path: req.params.path });
+    res.json({ success: true, path: sanitizedPath });
   } catch (error) {
     console.error('Error saving file:', error);
     res.status(500).json({ error: error.message });
@@ -390,25 +458,51 @@ app.post('/api/files/:path(*)', async (req, res) => {
 });
 
 // 功能項目: 2.2.3 創建新文件
-app.put('/api/files/:path(*)', async (req, res) => {
+app.put('/api/files/:path(*)', authenticateToken, async (req, res) => {
   try {
     const { content = '' } = req.body;
-    const filePath = path.join(MARKDOWN_DIR, req.params.path);
-    
+
+    // 驗證內容類型
+    if (typeof content !== 'string') {
+      return res.status(400).json({ error: 'Content must be a string' });
+    }
+
+    // 限制內容大小
+    if (Buffer.byteLength(content, 'utf8') > 10 * 1024 * 1024) {
+      return res.status(400).json({ error: 'Content too large' });
+    }
+
+    // 驗證並清理路徑
+    const sanitizedPath = sanitizePath(req.params.path);
+
+    // 確保路徑是 markdown 文件
+    if (!sanitizedPath.toLowerCase().endsWith('.md')) {
+      return res.status(400).json({ error: 'Only markdown files are allowed' });
+    }
+
+    const filePath = path.join(MARKDOWN_DIR, sanitizedPath);
+
+    // 確保路徑在 MARKDOWN_DIR 內
+    const resolvedPath = path.resolve(filePath);
+    const resolvedMarkdownDir = path.resolve(MARKDOWN_DIR);
+    if (!resolvedPath.startsWith(resolvedMarkdownDir)) {
+      return res.status(400).json({ error: 'Invalid file path: outside allowed directory' });
+    }
+
     // 檢查文件是否已存在
     try {
       await fs.access(filePath);
-      return res.status(409).json({ error: `File already exists: ${req.params.path}` });
+      return res.status(409).json({ error: `File already exists: ${sanitizedPath}` });
     } catch (error) {
       // 文件不存在，可以創建
     }
-    
+
     // 確保目錄存在
     const dirPath = path.dirname(filePath);
     await fs.mkdir(dirPath, { recursive: true });
-    
+
     await fs.writeFile(filePath, content, 'utf-8');
-    res.status(201).json({ success: true, path: req.params.path });
+    res.status(201).json({ success: true, path: sanitizedPath });
   } catch (error) {
     console.error('Error creating file:', error);
     res.status(500).json({ error: error.message });
@@ -416,18 +510,33 @@ app.put('/api/files/:path(*)', async (req, res) => {
 });
 
 // 功能項目: 2.2.4 刪除文件
-app.delete('/api/files/:path(*)', async (req, res) => {
+app.delete('/api/files/:path(*)', authenticateToken, async (req, res) => {
   try {
-    const filePath = path.join(MARKDOWN_DIR, req.params.path);
-    
+    // 驗證並清理路徑
+    const sanitizedPath = sanitizePath(req.params.path);
+
+    // 確保路徑是 markdown 文件
+    if (!sanitizedPath.toLowerCase().endsWith('.md')) {
+      return res.status(400).json({ error: 'Only markdown files are allowed' });
+    }
+
+    const filePath = path.join(MARKDOWN_DIR, sanitizedPath);
+
+    // 確保路徑在 MARKDOWN_DIR 內
+    const resolvedPath = path.resolve(filePath);
+    const resolvedMarkdownDir = path.resolve(MARKDOWN_DIR);
+    if (!resolvedPath.startsWith(resolvedMarkdownDir)) {
+      return res.status(400).json({ error: 'Invalid file path: outside allowed directory' });
+    }
+
     try {
       await fs.access(filePath);
     } catch (error) {
-      return res.status(404).json({ error: `File not found: ${req.params.path}` });
+      return res.status(404).json({ error: `File not found: ${sanitizedPath}` });
     }
-    
+
     await fs.unlink(filePath);
-    res.json({ success: true, path: req.params.path });
+    res.json({ success: true, path: sanitizedPath });
   } catch (error) {
     console.error('Error deleting file:', error);
     res.status(500).json({ error: error.message });
@@ -435,40 +544,222 @@ app.delete('/api/files/:path(*)', async (req, res) => {
 });
 
 // 功能項目: 2.2.5 重命名文件
-app.patch('/api/files/:path(*)', async (req, res) => {
+app.patch('/api/files/:path(*)', authenticateToken, async (req, res) => {
   try {
     const { newPath } = req.body;
     if (!newPath) {
       return res.status(400).json({ error: 'New path is required' });
     }
-    
-    const oldPath = path.join(MARKDOWN_DIR, req.params.path);
-    const targetPath = path.join(MARKDOWN_DIR, newPath);
-    
+
+    // 驗證並清理路徑
+    const sanitizedOldPath = sanitizePath(req.params.path);
+    const sanitizedNewPath = sanitizePath(newPath);
+
+    // 確保路徑是 markdown 文件
+    if (!sanitizedOldPath.toLowerCase().endsWith('.md') || !sanitizedNewPath.toLowerCase().endsWith('.md')) {
+      return res.status(400).json({ error: 'Only markdown files are allowed' });
+    }
+
+    const oldPath = path.join(MARKDOWN_DIR, sanitizedOldPath);
+    const targetPath = path.join(MARKDOWN_DIR, sanitizedNewPath);
+
+    // 確保路徑在 MARKDOWN_DIR 內
+    const resolvedOldPath = path.resolve(oldPath);
+    const resolvedNewPath = path.resolve(targetPath);
+    const resolvedMarkdownDir = path.resolve(MARKDOWN_DIR);
+    if (!resolvedOldPath.startsWith(resolvedMarkdownDir) || !resolvedNewPath.startsWith(resolvedMarkdownDir)) {
+      return res.status(400).json({ error: 'Invalid file path: outside allowed directory' });
+    }
+
     // 檢查源文件是否存在
     try {
       await fs.access(oldPath);
     } catch (error) {
-      return res.status(404).json({ error: `File not found: ${req.params.path}` });
+      return res.status(404).json({ error: `File not found: ${sanitizedOldPath}` });
     }
-    
+
     // 檢查目標文件是否已存在
     try {
       await fs.access(targetPath);
-      return res.status(409).json({ error: `Target file already exists: ${newPath}` });
+      return res.status(409).json({ error: `Target file already exists: ${sanitizedNewPath}` });
     } catch (error) {
       // 目標文件不存在，可以重命名
     }
-    
+
     // 確保目標目錄存在
     const targetDir = path.dirname(targetPath);
     await fs.mkdir(targetDir, { recursive: true });
-    
+
     await fs.rename(oldPath, targetPath);
-    res.json({ success: true, oldPath: req.params.path, newPath });
+    res.json({ success: true, oldPath: sanitizedOldPath, newPath: sanitizedNewPath });
   } catch (error) {
     console.error('Error renaming file:', error);
     res.status(500).json({ error: error.message });
+  }
+});
+
+// AI 功能 API 端點
+const { Configuration, OpenAIApi } = require('openai');
+
+// 初始化 OpenAI 配置
+let openai;
+const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
+const OPENAI_BASE_URL = process.env.OPENAI_BASE_URL || 'https://api.openai.com/v1';
+const OPENAI_MODEL = process.env.OPENAI_MODEL || 'gpt-3.5-turbo';
+
+if (OPENAI_API_KEY) {
+  const configuration = new Configuration({
+    apiKey: OPENAI_API_KEY,
+    basePath: OPENAI_BASE_URL, // 支援自定義 API 端點
+  });
+  openai = new OpenAIApi(configuration);
+  console.log(`AI service configured with endpoint: ${OPENAI_BASE_URL}, model: ${OPENAI_MODEL}`);
+} else {
+  console.warn('Warning: OPENAI_API_KEY not found. AI features will use mock responses.');
+}
+
+// AI 聊天端點
+app.post('/api/ai/chat', async (req, res) => {
+  try {
+    const { message, context, filePath, conversation, systemPrompt } = req.body;
+
+    if (!message) {
+      return res.status(400).json({ error: 'Message is required' });
+    }
+
+    // 如果沒有配置 OpenAI API 密鑰，返回模擬回應
+    if (!openai) {
+      // 模擬 AI 回應
+      const mockResponse = {
+        response: `這是一個模擬的 AI 回應。您剛剛問道：「${message}」\n\n如果配置了 OpenAI API 密鑰，您將獲得實際的 AI 分析結果。`,
+        updatedContent: null
+      };
+      return res.json(mockResponse);
+    }
+
+    // 構建對話歷史
+    let defaultSystemPrompt = `你是一個 Markdown 文件編輯助手。你可以幫助用戶總結、重寫、格式化 Markdown 文件，回答有關文件內容的問題，以及提供其他文本相關的幫助。當前編輯的文件是 ${filePath || '未指定'}。文件內容是：\n\n${context || '無內容'}`;
+
+    // 如果提供了自定義系統提示詞，則使用它，否則使用默認的
+    let systemContent = systemPrompt || defaultSystemPrompt;
+
+    let conversationHistory = [
+      { role: 'system', content: systemContent }
+    ];
+
+    // 添加之前的對話歷史（最多保留最近的 10 條消息）
+    if (conversation && Array.isArray(conversation)) {
+      const recentConversations = conversation.slice(-10).map(msg => ({
+        role: msg.role === 'user' ? 'user' : 'assistant',
+        content: msg.content
+      }));
+      conversationHistory = conversationHistory.concat(recentConversations);
+    }
+
+    // 添加當前用戶消息
+    conversationHistory.push({ role: 'user', content: message });
+
+    // 調用 OpenAI API
+    const response = await openai.createChatCompletion({
+      model: OPENAI_MODEL, // 使用環境變數指定的模型
+      messages: conversationHistory,
+      max_tokens: 1000,
+      temperature: 0.7,
+    });
+
+    const aiResponse = response.data.choices[0].message.content;
+
+    // 返回 AI 回應
+    res.json({
+      response: aiResponse,
+      updatedContent: null // 這個端點不直接修改內容，而是讓用戶決定是否使用 AI 的建議
+    });
+  } catch (error) {
+    console.error('Error in AI chat:', error);
+    res.status(500).json({ error: 'AI service error: ' + error.message });
+  }
+});
+
+// AI 功能端點（總結、重寫等）
+app.post('/api/ai/functions', async (req, res) => {
+  try {
+    const { function: functionName, context, filePath, systemPrompt } = req.body;
+
+    if (!functionName || !context) {
+      return res.status(400).json({ error: 'Function name and context are required' });
+    }
+
+    // 如果沒有配置 OpenAI API 密鑰，返回模擬回應
+    if (!openai) {
+      const mockResponses = {
+        summarize: `這是一個模擬的文件總結功能。實際上，AI 會分析文件內容並生成摘要。\n\n原文件包含 ${context.length} 個字符，標題和段落結構將被保留。`,
+        rewrite: `# 模擬重寫結果\n\n這是模擬的重寫內容。如果配置了 OpenAI API 密鑰，您將獲得真正的 AI 重寫結果。\n\n模擬優化：文本結構已改進，表達更清晰。`,
+        format: `# 標題格式化\n\n- 項目 1\n- 項目 2\n\n段落之間添加了適當的空行。`,
+        explain: `這是一個模擬的內容解釋功能。實際上，AI 會分析文件內容並提供詳細解釋。\n\n文件主要包含 Markdown 格式的文本內容。`
+      };
+
+      const mockResponse = {
+        response: mockResponses[functionName] || `模擬的 ${functionName} 功能結果`,
+        updatedContent: functionName === 'rewrite' ? mockResponses[functionName] : null
+      };
+      return res.json(mockResponse);
+    }
+
+    let prompt = '';
+    let responseFormat = '';
+
+    switch (functionName) {
+      case 'summarize':
+        prompt = `請總結以下 Markdown 文件的內容，保持主要信息和結構。文件路徑：${filePath || 'unknown'}\n\n文件內容：\n${context}`;
+        responseFormat = 'response only summary';
+        break;
+      case 'rewrite':
+        prompt = `請重寫以下 Markdown 文件，改進文字表達、結構和可讀性，但保持原意。文件路徑：${filePath || 'unknown'}\n\n文件內容：\n${context}`;
+        responseFormat = 'modified markdown content';
+        break;
+      case 'format':
+        prompt = `請格式化以下 Markdown 文件，使其結構更清晰，符合標準 Markdown 規範。文件路徑：${filePath || 'unknown'}\n\n文件內容：\n${context}`;
+        responseFormat = 'formatted markdown content';
+        break;
+      case 'explain':
+        prompt = `請詳細解釋以下 Markdown 文件的內容，包括主要觀點、結構和任何技術細節。文件路徑：${filePath || 'unknown'}\n\n文件內容：\n${context}`;
+        responseFormat = 'explanation of content';
+        break;
+      default:
+        return res.status(400).json({ error: `Unknown function: ${functionName}` });
+    }
+
+    // 使用默認系統提示詞，或使用自定義的
+    let defaultSystemPrompt = '你是一個專業的 Markdown 文件處理助手。根據用戶的請求，對 Markdown 文件進行相應處理，並返回適當格式的結果。';
+    let systemContent = systemPrompt || defaultSystemPrompt;
+
+    // 調用 OpenAI API
+    const response = await openai.createChatCompletion({
+      model: OPENAI_MODEL, // 使用環境變數指定的模型
+      messages: [
+        { role: 'system', content: systemContent },
+        { role: 'user', content: prompt }
+      ],
+      max_tokens: 1500,
+      temperature: 0.5,
+    });
+
+    const aiResponse = response.data.choices[0].message.content;
+
+    // 根據功能類型決定是否返回更新後的內容
+    let updatedContent = null;
+    if (functionName === 'rewrite' || functionName === 'format') {
+      updatedContent = aiResponse;
+    }
+
+    // 返回 AI 回應和可能的更新後內容
+    res.json({
+      response: aiResponse,
+      updatedContent: updatedContent
+    });
+  } catch (error) {
+    console.error('Error in AI function:', error);
+    res.status(500).json({ error: 'AI service error: ' + error.message });
   }
 });
 

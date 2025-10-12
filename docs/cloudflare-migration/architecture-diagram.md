@@ -1,4 +1,4 @@
-# Vditor SaaS Architecture Diagram
+# CoSpec AI SaaS Architecture Diagram
 
 ## System Architecture
 

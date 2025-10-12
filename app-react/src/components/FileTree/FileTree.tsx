@@ -1,9 +1,14 @@
-import React, { useState, useEffect, memo, useCallback } from 'react';
+import React, { useEffect, memo, useCallback, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useSelector, useDispatch } from 'react-redux';
+import { setFileList, setLoading, refreshFileList } from '../../store/slices/filesSlice';
+import { togglePathExpanded, expandPath } from '../../store/slices/uiSlice';
+import { addNotification } from '../../store/slices/notificationsSlice';
 import { fileApi, type FileInfo } from '../../services/api';
 import { cn } from '../../lib/utils';
 import { Button } from '../ui/button';
 import { webSocketService, connectWebSocket } from '../../services/websocket';
+import type { RootState } from '../../store';
 
 interface TreeNode {
   name: string;
@@ -23,14 +28,13 @@ interface FileTreeProps {
  * @see /docs/requirements.md#31-側邊欄目錄樹
  */
 function FileTreeComponent({ className }: FileTreeProps) {
-  const [files, setFiles] = useState<FileInfo[]>([]);
-  const [treeData, setTreeData] = useState<TreeNode[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  // 存儲展開的目錄路徑
-  const [expandedPaths, setExpandedPaths] = useState<Set<string>>(new Set());
-  // 添加刷新計數器，用於觸發文件列表重新加載
-  const [refreshCounter, setRefreshCounter] = useState(0);
+  const dispatch = useDispatch();
+  const files = useSelector((state: RootState) => state.files.fileList);
+  const loading = useSelector((state: RootState) => state.files.loading);
+  const error = useSelector((state: RootState) => state.files.error);
+  const refreshCounter = useSelector((state: RootState) => state.files.refreshCounter);
+  const expandedPathsSet = useSelector((state: RootState) => new Set(state.ui.expandedPaths));
+  const [treeData, setTreeData] = React.useState<TreeNode[]>([]);
   const navigate = useNavigate();
   /**
    * 從 URL 中獲取當前文件路徑
@@ -48,7 +52,7 @@ function FileTreeComponent({ className }: FileTreeProps) {
   const fetchFiles = useCallback(async (showLoading = false) => {
     try {
       if (showLoading) {
-        setLoading(true);
+        dispatch(setLoading(true));
       }
       
       const fileList = await fileApi.getAllFiles();
@@ -56,31 +60,39 @@ function FileTreeComponent({ className }: FileTreeProps) {
       // 比較文件列表是否有變化，只有變化時才更新
       const hasChanged = JSON.stringify(fileList) !== JSON.stringify(files);
       if (hasChanged) {
-        setFiles(fileList);
+        dispatch(setFileList(fileList));
         setLastUpdateTime(Date.now());
       }
       
-      setLoading(false);
+      dispatch(setLoading(false));
     } catch (err) {
-      setError('Failed to fetch files');
-      setLoading(false);
+      dispatch(addNotification({
+        type: 'error',
+        message: 'Failed to fetch files',
+        title: 'Load Error'
+      }));
+      dispatch(setLoading(false));
       console.error('Error fetching files:', err);
     }
-  }, [files]);
+  }, [dispatch, files]);
 
   // 手動刷新文件列表
   const refreshFiles = useCallback(async () => {
     try {
-      setLoading(true);
+      dispatch(setLoading(true));
       // 使用新增的緩存刷新端點
       await fileApi.refreshFileCache();
       await fetchFiles(false);
     } catch (err) {
       console.error('Error refreshing files:', err);
-      setError('Failed to refresh files');
-      setLoading(false);
+      dispatch(addNotification({
+        type: 'error',
+        message: 'Failed to refresh files',
+        title: 'Refresh Error'
+      }));
+      dispatch(setLoading(false));
     }
-  }, [fetchFiles]);
+  }, [dispatch, fetchFiles]);
 
   // 初始加載和刷新計數器變化時加載文件
   useEffect(() => {
@@ -172,26 +184,28 @@ function FileTreeComponent({ className }: FileTreeProps) {
       let currentDirPath = '';
       
       // 展開所有父目錄
-      setExpandedPaths(prevPaths => {
-        const newPaths = new Set(prevPaths);
-        for (let i = 0; i < pathParts.length; i++) {
-          if (pathParts[i]) { // 確保不是空字串
-            currentDirPath = currentDirPath 
-              ? `${currentDirPath}/${pathParts[i]}` 
-              : pathParts[i];
-            newPaths.add(currentDirPath);
-          }
+      for (let i = 0; i < pathParts.length; i++) {
+        if (pathParts[i]) { // 確保不是空字串
+          currentDirPath = currentDirPath 
+            ? `${currentDirPath}/${pathParts[i]}` 
+            : pathParts[i];
+          dispatch(expandPath(currentDirPath));
         }
-        return newPaths;
-      });
+      }
     }
-  }, [currentPath]);
+  }, [currentPath, dispatch]);
 
   useEffect(() => {
     // 構建樹狀結構
     const buildTree = (files: FileInfo[]) => {
       const root: TreeNode[] = [];
       const directoryMap: Record<string, TreeNode> = {};
+
+      // 驗證 files 是有效的陣列
+      if (!files || !Array.isArray(files)) {
+        console.warn('Files is not an array:', files);
+        return root;
+      }
 
       // 先創建所有目錄
       files.forEach(file => {
@@ -210,7 +224,7 @@ function FileTreeComponent({ className }: FileTreeProps) {
               path: currentPath,
             };
             directoryMap[currentPath] = newDir;
-            
+
             if (parentPath) {
               directoryMap[parentPath].children = directoryMap[parentPath].children || [];
               directoryMap[parentPath].children?.push(newDir);
@@ -226,7 +240,7 @@ function FileTreeComponent({ className }: FileTreeProps) {
         const pathParts = file.path.split('/');
         const fileName = pathParts[pathParts.length - 1];
         const parentPath = pathParts.slice(0, -1).join('/');
-        
+
         const fileNode: TreeNode = {
           name: fileName,
           type: 'file',
@@ -283,15 +297,7 @@ function FileTreeComponent({ className }: FileTreeProps) {
    * @see /docs/requirements.md#315-展開狀態持久化
    */
   const handleDirectoryToggle = (path: string) => {
-    setExpandedPaths(prevPaths => {
-      const newPaths = new Set(prevPaths);
-      if (newPaths.has(path)) {
-        newPaths.delete(path);
-      } else {
-        newPaths.add(path);
-      }
-      return newPaths;
-    });
+    dispatch(togglePathExpanded(path));
   };
 
 /**
@@ -439,12 +445,17 @@ const renderTree = (nodes: TreeNode[], currentPath: string | null, expandedPaths
                 fileApi.createFile(fileName, '# New File\n\nStart writing here...')
                   .then(() => {
                     // 刷新文件列表，然後導航到新文件
-                    setRefreshCounter(prev => prev + 1);
+                    dispatch(refreshFileList());
+                    dispatch(addNotification({
+                      type: 'success',
+                      message: `File ${fileName} created successfully`,
+                      title: 'Success'
+                    }));
                     navigate(`/edit/${encodeURIComponent(fileName)}`);
                   })
                   .catch(err => {
                     console.error('Error creating file:', err);
-                    alert('Failed to create file');
+                    // Error is handled by the API interceptor
                   });
               }
             }}
@@ -454,7 +465,7 @@ const renderTree = (nodes: TreeNode[], currentPath: string | null, expandedPaths
         </div>
       </div>
       {treeData.length > 0 ? (
-        renderTree(treeData, currentPath, expandedPaths, handleFileClick, handleDirectoryToggle, handleDirectoryClick)
+        renderTree(treeData, currentPath, expandedPathsSet, handleFileClick, handleDirectoryToggle, handleDirectoryClick)
       ) : (
         <div className="text-gray-500">No files found</div>
       )}

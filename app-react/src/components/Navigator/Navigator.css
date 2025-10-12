@@ -99,7 +99,7 @@
   max-height: 400px;
   display: flex;
   flex-direction: column;
-  z-index: 1000; /* 增加 z-index 確保顯示在 Toolbar 之上 */
+  z-index: 2000; /* 增加 z-index 確保顯示在 Toolbar 之上 */
 }
 
 /* 標籤頁 */

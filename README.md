@@ -1,4 +1,4 @@
-# Vditor Markdown 編輯應用
+# CoSpec AI Markdown 編輯應用
 
 這個倉庫包含了一個基於 [Vditor](https://github.com/Vanessa219/vditor) 的 Markdown 編輯應用，使用 Docker 容器化，並支持掛載本地目錄作為 Markdown 文件的存儲位置。
 
@@ -22,8 +22,8 @@
 
 1. 克隆此倉庫：
    ```bash
-   git clone https://github.com/yourusername/vditor-docker.git
-   cd vditor-docker
+   git clone https://github.com/yourusername/cospec-ai.git
+   cd cospec-ai
    ```
 
 2. 構建並啟動容器：
@@ -40,8 +40,8 @@
 
 1. 克隆此倉庫並進入目錄：
    ```bash
-   git clone https://github.com/yourusername/vditor-docker.git
-   cd vditor-docker
+   git clone https://github.com/yourusername/cospec-ai.git
+   cd cospec-ai
    ```
 
 2. 使用環境變數指定 Markdown 文件目錄並啟動容器：
@@ -85,12 +85,12 @@ MARKDOWN_DIR=/path/to/your/markdown/files docker compose up -d
 如果您想手動構建 Docker 映像：
 
 ```bash
-docker build -t vditor-app .
+docker build -t cospec-ai-app .
 ```
 
 運行容器：
 ```bash
-docker run -p 3000:3000 -p 3001:3001 -v /path/to/your/markdown/files:/markdown vditor-app
+docker run -p 3000:3000 -p 3001:3001 -v /path/to/your/markdown/files:/markdown cospec-ai-app
 ```
 
 ## 文件結構
@@ -120,11 +120,33 @@ docker run -p 3000:3000 -p 3001:3001 -v /path/to/your/markdown/files:/markdown v
 └── README.md             # 說明文件
 ```
 
-## 技術梱手
+## 技術棧
 
-- **前端**：Vue 3, Vite, Pinia, Vue Router, Vditor
-- **後端**：Node.js, Express
+- **前端**：React, TypeScript, Vite, Redux Toolkit, React Router, CoSpec AI
+- **後端**：Node.js, Express, Socket.io
 - **容器化**：Docker, Docker Compose
+
+## Docker 配置
+
+本項目提供兩種 Docker 配置：
+
+### 生產環境
+```bash
+# 使用默認配置運行（構建並運行生產版本）
+docker compose up --build
+
+# 指定 markdown 目錄
+MARKDOWN_DIR=/path/to/your/markdown docker compose up --build
+```
+
+### 開發環境
+```bash
+# 開發模式運行（源碼掛載，實時重載）
+docker compose -f docker-compose-dev.yml up --build
+
+# 開發模式指定 markdown 目錄
+MARKDOWN_DIR=/path/to/your/markdown docker compose -f docker-compose-dev.yml up --build
+```
 
 ## 授權許可
 

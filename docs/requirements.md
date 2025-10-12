@@ -1,4 +1,4 @@
-# Vditor Markdown 編輯應用功能需求
+# CoSpec AI Markdown 編輯應用功能需求
 
 ## 1. 系統架構
 ### 1.1. Docker 容器化

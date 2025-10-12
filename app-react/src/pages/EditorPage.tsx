@@ -1,19 +1,21 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
+import { useSelector, useDispatch } from 'react-redux';
+import { setSidebarWidth } from '../store/slices/uiSlice';
 import { FileTree } from '../components/FileTree/FileTree';
 import { MarkdownEditor } from '../components/MarkdownEditor/MarkdownEditor';
 import { DirectoryViewer } from '../components/DirectoryViewer/DirectoryViewer';
 import { Navigator } from '../components/Navigator/Navigator';
+import type { RootState } from '../store';
 
 export function EditorPage() {
   // 使用 useLocation 來獲取完整的 URL 路徑
   const location = useLocation();
+  const dispatch = useDispatch();
   
-  // 從 localStorage 讀取保存的寬度值，如果沒有則使用預設值 280
-  const [sidebarWidth, setSidebarWidth] = useState(() => {
-    const savedWidth = localStorage.getItem('sidebarWidth');
-    return savedWidth ? parseInt(savedWidth, 10) : 280;
-  });
+  // 從 Redux store 獲取 sidebarWidth
+  const sidebarWidth = useSelector((state: RootState) => state.ui.sidebarWidth);
+  
   // 添加刷新計數器狀態，用於強制重新渲染 FileTree 組件
   const [refreshKey, setRefreshKey] = useState(0);
   
@@ -66,8 +68,8 @@ export function EditorPage() {
         (sidebarElement as HTMLElement).style.width = `${newWidth}px`;
       }
       
-      // 更新狀態
-      setSidebarWidth(newWidth);
+      // 更新 Redux store
+      dispatch(setSidebarWidth(newWidth));
       
       // 儲存到 localStorage
       try {
@@ -110,8 +112,11 @@ export function EditorPage() {
         }}
       >
         <div style={{ padding: '0.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #e2e8f0' }}>
-          <h2 style={{ fontSize: '1.125rem', fontWeight: 600 }}>Files</h2>
-          <button 
+          <h2 style={{ fontSize: '1.125rem', fontWeight: 600, display: 'flex', alignItems: 'center' }}>
+            <img src="/logo.svg" alt="CoSpec AI" style={{ width: '24px', height: '24px', marginRight: '0.5rem' }} />
+            CoSpec AI
+          </h2>
+          <button
             style={{ padding: '0.25rem', borderRadius: '0.25rem', cursor: 'pointer' }}
             onClick={refreshFileTree}
             title="Refresh file list"
@@ -152,9 +157,11 @@ export function EditorPage() {
       <div style={{ flex: 1, height: '100%', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
         {/* 只在非目錄模式下顯示 Navigator */}
         {filePath && !isDirectory && (
-          <Navigator />
+          <div style={{ position: 'relative', zIndex: 1600 }}>
+            <Navigator />
+          </div>
         )}
-        
+
         <div style={{ flex: 1, overflow: 'auto' }}>
           {filePath ? (
             isDirectory ? (

@@ -1,4 +1,4 @@
-# Vditor Markdown 編輯應用 - 已解決問題清單
+# CoSpec AI Markdown 編輯應用 - 已解決問題清單
 
 ## 1. 前端框架重構
 

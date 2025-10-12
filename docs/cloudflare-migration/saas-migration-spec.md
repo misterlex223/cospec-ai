@@ -1,14 +1,14 @@
-# Vditor Markdown SaaS Migration Specification
+# CoSpec AI Markdown SaaS Migration Specification
 
 ## 1. Introduction
 
-This document outlines the migration plan for transforming the Vditor Markdown editor application from its current Docker-based architecture to a cloud-native SaaS platform using Cloudflare services. The new architecture will support a multi-tenant model with organization, project, and user hierarchies.
+This document outlines the migration plan for transforming the CoSpec AI Markdown editor application from its current Docker-based architecture to a cloud-native SaaS platform using Cloudflare services. The new architecture will support a multi-tenant model with organization, project, and user hierarchies.
 
 ## 2. Current Architecture
 
-The current Vditor Markdown editor is a containerized application with the following components:
+The current CoSpec AI Markdown editor is a containerized application with the following components:
 
-- **Frontend**: Vue 3 or React-based web application
+- **Frontend**: React-based web application
 - **Backend**: Node.js/Express API server
 - **Storage**: Local file system for Markdown files
 - **Deployment**: Docker containers orchestrated with Docker Compose

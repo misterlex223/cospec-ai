@@ -1,4 +1,4 @@
-# Vditor SaaS Data Model
+# CoSpec AI SaaS Data Model
 
 ## Overview
 

@@ -1,4 +1,4 @@
-# Vditor SaaS Migration Strategy
+# CoSpec AI SaaS Migration Strategy
 
 ## Overview
 

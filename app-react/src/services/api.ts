@@ -1,8 +1,49 @@
 import axios from 'axios';
+import { addNotification } from '../store/slices/notificationsSlice';
+import { store } from '../store';
+
+const API_KEY = 'demo-api-key'; // In a real app, this would be securely stored
 
 const api = axios.create({
   baseURL: '/api',
 });
+
+// Add request interceptor to include auth token
+api.interceptors.request.use(
+  (config) => {
+    config.headers.Authorization = `Bearer ${API_KEY}`;
+    return config;
+  },
+  (error) => {
+    return Promise.reject(error);
+  }
+);
+
+// Add response interceptor to handle errors and show notifications
+api.interceptors.response.use(
+  (response) => {
+    return response;
+  },
+  (error) => {
+    // Extract error message from response
+    let errorMessage = 'An unexpected error occurred';
+    
+    if (error.response && error.response.data && error.response.data.error) {
+      errorMessage = error.response.data.error;
+    } else if (error.message) {
+      errorMessage = error.message;
+    }
+    
+    // Dispatch error notification
+    store.dispatch(addNotification({
+      type: 'error',
+      message: errorMessage,
+      title: 'API Error'
+    }));
+    
+    return Promise.reject(error);
+  }
+);
 
 export interface FileInfo {
   path: string;
@@ -14,7 +55,13 @@ export const fileApi = {
   getAllFiles: async (): Promise<FileInfo[]> => {
     try {
       const response = await api.get('/files');
-      return response.data;
+      // 確保返回的數據是陣列，如果不是則返回空陣列
+      if (Array.isArray(response.data)) {
+        return response.data;
+      } else {
+        console.warn('API response is not an array:', response.data);
+        return [];
+      }
     } catch (error) {
       console.error('Error fetching files:', error);
       throw error;

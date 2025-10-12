@@ -1,9 +1,13 @@
-# Vditor Markdown 編輯應用文檔
+# CoSpec AI Markdown 編輯應用文檔
 
 ## 文檔結構
 
 - [requirements.md](requirements.md) - 應用功能需求規格
 - [solved_issues.md](solved_issues.md) - 已解決問題清單
+- [改善計劃.md](改善計劃.md) - 應用改善計劃
+- [changelogs/](changelogs/) - 變更記錄
+  - [README.md](changelogs/README.md) - 變更記錄說明
+  - [2025-10-10-improvements.md](changelogs/2025-10-10-improvements.md) - 2025年10月10日改進記錄
 - [cloudflare-migration/](cloudflare-migration/) - Cloudflare SaaS 遷移規格文檔
   - [saas-migration-spec.md](cloudflare-migration/saas-migration-spec.md) - SaaS 遷移規格
   - [data-model.md](cloudflare-migration/data-model.md) - 數據模型設計
@@ -35,12 +39,12 @@
 
 ### 2. MarkdownEditor 組件
 
-Markdown 編輯器組件，負責初始化 Vditor 編輯器、加載文件內容和保存文件。
+Markdown 編輯器組件，負責初始化 CoSpec AI Markdown 編輯器、加載文件內容和保存文件。
 
 - 路徑：`/app-react/src/components/MarkdownEditor/MarkdownEditor.tsx`
 - 相關問題：
   - [首次加載文件內容不顯示](solved_issues.md#31-首次加載文件內容不顯示)
-  - [Vditor 配置錯誤](solved_issues.md#32-vditor-配置錯誤)
+  - [CoSpec AI 配置錯誤](solved_issues.md#32-cospec-ai-配置錯誤)
 
 ## 開發環境
 

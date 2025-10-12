@@ -2,44 +2,42 @@
 FROM node:20-alpine
 
 # 設定工作目錄
-WORKDIR /app
+WORKDIR /app-react
 
-# 安裝 pnpm
-RUN npm install -g pnpm
-
-# 複製前端應用程式的 package.json
-COPY app/package.json ./
-
-# 安裝前端依賴
-RUN pnpm install
-
-# 複製前端源碼
-COPY app/index.html ./
-COPY app/vite.config.js ./
-COPY app/src ./src
-COPY app/public ./public
-
-# 建立後端目錄
-WORKDIR /server
-
-# 複製後端 package.json
-COPY app/server/package.json ./
-
-# 安裝後端依賴
+# 安裝依賴
+COPY app-react/package*.json ./
 RUN npm install
 
+# 複製前端源碼，但排除 node_modules 目錄
+COPY app-react/src ./src
+COPY app-react/public ./public
+COPY app-react/*.js ./
+COPY app-react/*.ts ./
+COPY app-react/*.json ./
+COPY app-react/*.html ./
+COPY app-react/*.cjs ./
+
 # 複製後端源碼
-COPY app/server/index.js ./
+WORKDIR /server
+COPY server/ ./
+RUN npm install
+
+# 設置環境變數
+# 預設為生產環境，但會被 docker-compose 中的設置覆蓋
+ENV NODE_ENV=production
+ENV MARKDOWN_DIR=/markdown
 
 # 建立 markdown 目錄
 RUN mkdir -p /markdown
 
-# 複製啟動腳本
-COPY docker-entrypoint.sh /usr/local/bin/
-RUN chmod +x /usr/local/bin/docker-entrypoint.sh
-
 # 暴露端口
-EXPOSE 3000 3001
+EXPOSE 3000
+EXPOSE 3001
 
-# 設定啟動命令
-ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"]
+# 複製啟動腳本
+WORKDIR /
+COPY docker-entrypoint.sh /docker-entrypoint.sh
+RUN chmod +x /docker-entrypoint.sh
+
+# 啟動應用
+CMD ["/docker-entrypoint.sh"]
