@@ -5,7 +5,7 @@ import { store } from '../store';
 const API_KEY = 'demo-api-key'; // In a real app, this would be securely stored
 
 const api = axios.create({
-  baseURL: '/api',
+  baseURL: './api', // Use relative path to support reverse proxy
 });
 
 // Add request interceptor to include auth token
