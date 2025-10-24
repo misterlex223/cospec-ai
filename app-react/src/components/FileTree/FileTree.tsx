@@ -4,11 +4,13 @@ import { useSelector, useDispatch } from 'react-redux';
 import { setFileList, setLoading, refreshFileList } from '../../store/slices/filesSlice';
 import { togglePathExpanded, expandPath } from '../../store/slices/uiSlice';
 import { addNotification } from '../../store/slices/notificationsSlice';
+import { syncFileToContext, unsyncFileFromContext, fetchSyncStatus } from '../../store/slices/contextSlice';
 import { fileApi, type FileInfo } from '../../services/api';
 import { cn } from '../../lib/utils';
 import { Button } from '../ui/button';
 import { webSocketService, connectWebSocket } from '../../services/websocket';
 import type { RootState } from '../../store';
+import type { AppDispatch } from '../../store';
 
 interface TreeNode {
   name: string;
@@ -313,19 +315,87 @@ interface FileNodeProps {
 }
 
 const FileNode = memo(({ node, currentPath, expandedPaths, onFileClick, onDirectoryToggle, onDirectoryClick }: FileNodeProps) => {
+  const dispatch = useDispatch<AppDispatch>();
+  const syncStatus = useSelector((state: RootState) => state.context.syncStatuses[node.path]);
+  const [showContextMenu, setShowContextMenu] = useState(false);
+  const [menuPosition, setMenuPosition] = useState({ x: 0, y: 0 });
+
+  const handleContextMenu = (e: React.MouseEvent) => {
+    if (node.type === 'file' && node.name.endsWith('.md')) {
+      e.preventDefault();
+      setMenuPosition({ x: e.clientX, y: e.clientY });
+      setShowContextMenu(true);
+    }
+  };
+
+  const handleSyncToContext = async () => {
+    try {
+      await dispatch(syncFileToContext(node.path)).unwrap();
+      dispatch(addNotification({
+        type: 'success',
+        message: `Synced ${node.name} to context`,
+        title: 'Context Sync'
+      }));
+    } catch (error: any) {
+      dispatch(addNotification({
+        type: 'error',
+        message: error.message || 'Failed to sync file',
+        title: 'Sync Error'
+      }));
+    }
+    setShowContextMenu(false);
+  };
+
+  const handleUnsyncFromContext = async () => {
+    try {
+      await dispatch(unsyncFileFromContext(node.path)).unwrap();
+      dispatch(addNotification({
+        type: 'success',
+        message: `Removed ${node.name} from context`,
+        title: 'Context Sync'
+      }));
+    } catch (error: any) {
+      dispatch(addNotification({
+        type: 'error',
+        message: error.message || 'Failed to unsync file',
+        title: 'Sync Error'
+      }));
+    }
+    setShowContextMenu(false);
+  };
+
+  useEffect(() => {
+    const handleClick = () => setShowContextMenu(false);
+    if (showContextMenu) {
+      document.addEventListener('click', handleClick);
+      return () => document.removeEventListener('click', handleClick);
+    }
+  }, [showContextMenu]);
+
+  const getSyncIcon = () => {
+    if (!syncStatus || syncStatus.status === 'not-synced') return null;
+    switch (syncStatus.status) {
+      case 'synced': return '✓';
+      case 'syncing': return '⟳';
+      case 'error': return '✗';
+      case 'auto-eligible': return '●';
+      default: return null;
+    }
+  };
+
   if (node.type === 'directory') {
     return (
       <div className="group">
-        <div 
+        <div
           className="flex items-center cursor-pointer p-1 hover:bg-gray-100 dark:hover:bg-gray-800 rounded"
         >
-          <span 
+          <span
             className="mr-2 cursor-pointer"
             onClick={() => onDirectoryToggle(node.path)}
           >
             {expandedPaths.has(node.path) ? '📂' : '📁'}
           </span>
-          <span 
+          <span
             className="flex-1 cursor-pointer"
             onClick={() => onDirectoryClick ? onDirectoryClick(node.path) : onDirectoryToggle(node.path)}
           >
@@ -334,12 +404,12 @@ const FileNode = memo(({ node, currentPath, expandedPaths, onFileClick, onDirect
         </div>
         {expandedPaths.has(node.path) && node.children && (
           <div className="ml-2">
-            <TreeList 
-              nodes={node.children} 
-              currentPath={currentPath} 
-              expandedPaths={expandedPaths} 
-              onFileClick={onFileClick} 
-              onDirectoryToggle={onDirectoryToggle} 
+            <TreeList
+              nodes={node.children}
+              currentPath={currentPath}
+              expandedPaths={expandedPaths}
+              onFileClick={onFileClick}
+              onDirectoryToggle={onDirectoryToggle}
             />
           </div>
         )}
@@ -347,14 +417,49 @@ const FileNode = memo(({ node, currentPath, expandedPaths, onFileClick, onDirect
     );
   } else {
     return (
-      <div 
-        className={`flex items-center cursor-pointer p-1 rounded ${currentPath === node.path ? 'bg-blue-100 dark:bg-blue-900' : 'hover:bg-gray-100 dark:hover:bg-gray-800'}`}
-        onClick={() => onFileClick(node.path)}
-      >
-        <span className="mr-2">📄</span>
-        <span className={currentPath === node.path ? 'font-semibold' : ''}>{node.name}</span>
-        {currentPath === node.path && <span className="ml-2 text-xs text-blue-600 dark:text-blue-400">• 當前</span>}
-      </div>
+      <>
+        <div
+          className={`flex items-center cursor-pointer p-1 rounded ${currentPath === node.path ? 'bg-blue-100 dark:bg-blue-900' : 'hover:bg-gray-100 dark:hover:bg-gray-800'}`}
+          onClick={() => onFileClick(node.path)}
+          onContextMenu={handleContextMenu}
+        >
+          <span className="mr-2">📄</span>
+          <span className={currentPath === node.path ? 'font-semibold' : ''}>{node.name}</span>
+          {getSyncIcon() && (
+            <span className={`ml-2 text-xs ${
+              syncStatus?.status === 'synced' ? 'text-green-600' :
+              syncStatus?.status === 'syncing' ? 'text-yellow-600' :
+              syncStatus?.status === 'error' ? 'text-red-600' :
+              'text-blue-600'
+            }`}>
+              {getSyncIcon()}
+            </span>
+          )}
+          {currentPath === node.path && <span className="ml-2 text-xs text-blue-600 dark:text-blue-400">• 當前</span>}
+        </div>
+        {showContextMenu && (
+          <div
+            className="fixed bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded shadow-lg z-50 py-1"
+            style={{ left: `${menuPosition.x}px`, top: `${menuPosition.y}px` }}
+          >
+            {syncStatus?.status === 'synced' ? (
+              <button
+                className="w-full text-left px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 text-sm"
+                onClick={handleUnsyncFromContext}
+              >
+                ✗ Remove from Context
+              </button>
+            ) : (
+              <button
+                className="w-full text-left px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 text-sm"
+                onClick={handleSyncToContext}
+              >
+                ☁ Sync to Context
+              </button>
+            )}
+          </div>
+        )}
+      </>
     );
   }
 });

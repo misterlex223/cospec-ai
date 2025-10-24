@@ -141,3 +141,30 @@ export const fileApi = {
     }
   }
 };
+
+// Context sync API
+export const contextApi = {
+  // Get context configuration
+  getConfig: async (): Promise<any> => {
+    const response = await api.get('/context-config');
+    return response.data;
+  },
+
+  // Sync file to context
+  syncFile: async (path: string): Promise<any> => {
+    const response = await api.post(`/files/${encodeURIComponent(path)}/sync-to-context`);
+    return response.data;
+  },
+
+  // Unsync file from context
+  unsyncFile: async (path: string): Promise<any> => {
+    const response = await api.delete(`/files/${encodeURIComponent(path)}/sync-to-context`);
+    return response.data;
+  },
+
+  // Get sync status
+  getSyncStatus: async (path: string): Promise<any> => {
+    const response = await api.get(`/files/${encodeURIComponent(path)}/sync-status`);
+    return response.data;
+  },
+};
