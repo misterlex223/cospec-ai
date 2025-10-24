@@ -27,7 +27,64 @@ class FileSyncManager {
     this.syncedFiles = new Map(); // filePath → { memoryId, lastSync, status }
     this.pendingSync = new Map(); // filePath → timeout handle
     this.debounceDelay = 3000; // Wait 3 seconds after edit before syncing
+    this.metadataDir = path.join(process.env.MARKDOWN_DIR || '/markdown', '.cospec-sync');
+    this.metadataFile = path.join(this.metadataDir, 'sync-metadata.json');
+    this.isInitialized = false;
     console.log('[FileSyncManager] Initialized');
+  }
+
+  /**
+   * Initialize metadata storage and load existing sync data
+   */
+  async initialize() {
+    if (this.isInitialized) return;
+
+    try {
+      // Ensure metadata directory exists
+      await fs.mkdir(this.metadataDir, { recursive: true });
+
+      // Load existing metadata
+      try {
+        const data = await fs.readFile(this.metadataFile, 'utf-8');
+        const metadata = JSON.parse(data);
+
+        // Restore syncedFiles map from JSON
+        if (metadata.syncedFiles) {
+          Object.entries(metadata.syncedFiles).forEach(([filePath, data]) => {
+            this.syncedFiles.set(filePath, data);
+          });
+        }
+
+        console.log(`[FileSyncManager] Loaded ${this.syncedFiles.size} synced files from metadata`);
+      } catch (error) {
+        // Metadata file doesn't exist yet, that's ok
+        console.log('[FileSyncManager] No existing metadata found, starting fresh');
+      }
+
+      this.isInitialized = true;
+    } catch (error) {
+      console.error('[FileSyncManager] Failed to initialize metadata storage:', error);
+    }
+  }
+
+  /**
+   * Persist sync metadata to disk
+   */
+  async saveMetadata() {
+    try {
+      await fs.mkdir(this.metadataDir, { recursive: true });
+
+      const metadata = {
+        version: 1,
+        lastUpdated: new Date().toISOString(),
+        syncedFiles: Object.fromEntries(this.syncedFiles)
+      };
+
+      await fs.writeFile(this.metadataFile, JSON.stringify(metadata, null, 2), 'utf-8');
+      console.log(`[FileSyncManager] Saved metadata for ${this.syncedFiles.size} files`);
+    } catch (error) {
+      console.error('[FileSyncManager] Failed to save metadata:', error);
+    }
   }
 
   /**
@@ -61,35 +118,15 @@ class FileSyncManager {
   }
 
   /**
-   * Update frontmatter with sync status
-   */
-  async updateFrontmatter(filePath, memoryId) {
-    try {
-      const fullPath = path.join(process.env.MARKDOWN_DIR || '/markdown', filePath);
-      const content = await fs.readFile(fullPath, 'utf-8');
-      const parsed = matter(content);
-
-      // Update frontmatter
-      parsed.data.context_synced = true;
-      parsed.data.context_memory_id = memoryId;
-      parsed.data.last_synced = new Date().toISOString();
-
-      // Write back
-      const updated = matter.stringify(parsed.content, parsed.data);
-      await fs.writeFile(fullPath, updated, 'utf-8');
-
-      console.log(`[FileSyncManager] Updated frontmatter for ${filePath}`);
-    } catch (error) {
-      console.error(`[FileSyncManager] Failed to update frontmatter for ${filePath}:`, error);
-    }
-  }
-
-  /**
    * Sync a file to Kai context system
    */
   async syncFile(filePath, content) {
     try {
       console.log(`[FileSyncManager] Syncing file: ${filePath}`);
+
+      // Ensure initialized
+      await this.initialize();
+
       const metadata = await this.extractMetadata(filePath, content);
 
       // Sync to Kai
@@ -107,8 +144,8 @@ class FileSyncManager {
           status: 'synced',
         });
 
-        // Update frontmatter
-        await this.updateFrontmatter(filePath, memory.id);
+        // Persist metadata to disk (separate file, NOT modifying original)
+        await this.saveMetadata();
 
         console.log(`[FileSyncManager] Successfully synced ${filePath}`);
         return { success: true, memoryId: memory.id };
@@ -122,6 +159,7 @@ class FileSyncManager {
         status: 'error',
         error: error.message,
       });
+      await this.saveMetadata();
       throw error;
     }
   }
@@ -165,6 +203,7 @@ class FileSyncManager {
       try {
         await kaiContextClient.deleteMemory(filePath);
         this.syncedFiles.delete(filePath);
+        await this.saveMetadata();
         console.log(`[FileSyncManager] Deleted memory for ${filePath}`);
       } catch (error) {
         console.error(`[FileSyncManager] Failed to delete memory for ${filePath}:`, error.message);
@@ -188,6 +227,7 @@ class FileSyncManager {
       console.log(`[FileSyncManager] Unmarking ${filePath} from sync`);
       await kaiContextClient.deleteMemory(filePath);
       this.syncedFiles.delete(filePath);
+      await this.saveMetadata();
       return { success: true };
     } catch (error) {
       return { success: false, error: error.message };

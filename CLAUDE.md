@@ -23,6 +23,8 @@ The CoSpec AI Markdown Editor is a containerized application that provides a Rea
 - **Framework**: Node.js + Express + Socket.IO
 - **File Operations**: CRUD operations for Markdown files with security validations
 - **File Watching**: Uses chokidar to monitor file changes and update clients via WebSocket
+- **Context Sync**: Integrates with Kai's context system to sync markdown files as memories
+- **Sync Metadata**: Stores sync state in `.cospec-sync/sync-metadata.json` (does NOT modify original files)
 - **Security**: Helmet, CORS, rate limiting, path sanitization, and basic token authentication
 - **Location**: `/server/`
 
@@ -74,6 +76,8 @@ docker build -t cospec-ai-app .
 - `MARKDOWN_DIR`: Directory for storing Markdown files (default: `/markdown`)
 - `NODE_ENV`: Environment mode (`production` or `development`)
 - `API_KEY`: Backend API authentication key (default: `demo-api-key`)
+- `KAI_PROJECT_ID`: Project ID for context sync integration (optional)
+- `KAI_BACKEND_URL`: Kai backend URL for context API (optional, default: `http://host.docker.internal:9900`)
 
 ## Key Components
 
@@ -84,6 +88,8 @@ docker build -t cospec-ai-app .
 - **Navigator**: Component for navigating between recently viewed files
 
 ### Backend API Endpoints
+
+**File Operations:**
 - `GET /api/files`: Retrieve all Markdown files in directory
 - `GET /api/files/:path`: Read file content
 - `POST /api/files/:path`: Save file content (requires auth)
@@ -92,11 +98,22 @@ docker build -t cospec-ai-app .
 - `PATCH /api/files/:path`: Rename file (requires auth)
 - `POST /api/files/refresh`: Refresh file cache (requires auth)
 
+**Context Sync (Kai Integration):**
+- `POST /api/files/:path/sync-to-context`: Manually mark file for sync to Kai context (requires auth)
+- `DELETE /api/files/:path/sync-to-context`: Unmark file from sync (requires auth)
+- `GET /api/files/:path/sync-status`: Get sync status for a file
+- `GET /api/context-config`: Get context sync configuration and health status
+
 ### File Structure
 - `/app-react/` - React frontend application
 - `/server/` - Node.js/Express backend server
+  - `index.js` - Main server with file watcher and API routes
+  - `fileSyncManager.js` - Manages context sync state (auto-sync patterns, metadata storage)
+  - `kaiContextClient.js` - Client for Kai context API
 - `/docs/` - Documentation files
 - `/markdown/` - Default directory for Markdown files
+  - `.cospec-sync/` - Hidden directory for sync metadata (auto-created, gitignored)
+    - `sync-metadata.json` - Persistent sync state (memoryId, lastSync, status per file)
 - `Dockerfile` - Container build configuration
 - `docker-compose.yml` - Production Docker Compose configuration
 - `docker-compose-dev.yml` - Development Docker Compose configuration
@@ -223,3 +240,81 @@ If deploying behind a different reverse proxy:
    npm run build -- --base=/custom-path/
    ```
    However, using `./` is recommended for maximum flexibility.
+
+## Context Sync Integration
+
+CoSpec AI integrates with Kai's context system to automatically sync markdown files as memories. This enables AI-powered context retrieval and knowledge management.
+
+### Auto-Sync Patterns
+
+Files matching these patterns are automatically synced to Kai's context system:
+- `specs/**/*.md` - Specification documents
+- `requirements/**/*.md` - Requirements documents
+- `docs/specs/**/*.md` - Spec documentation
+- `**/*.spec.md` - Files ending with `.spec.md`
+- `SPEC.md` - Root spec file
+- `REQUIREMENTS.md` - Root requirements file
+
+### Manual Sync Control
+
+Users can manually mark/unmark files for sync via:
+- **Frontend UI**: Context menu option on files in the file tree
+- **API**: `POST /api/files/:path/sync-to-context` endpoint
+
+### Sync Metadata Storage
+
+**Important**: CoSpec AI does NOT modify original markdown files. All sync metadata is stored separately in `.cospec-sync/sync-metadata.json`.
+
+**Metadata Structure**:
+```json
+{
+  "version": 1,
+  "lastUpdated": "2025-01-23T10:30:00.000Z",
+  "syncedFiles": {
+    "specs/api-design.md": {
+      "memoryId": "abc-123-def-456",
+      "lastSync": "2025-01-23T10:29:45.000Z",
+      "status": "synced"
+    }
+  }
+}
+```
+
+### File Watcher Behavior
+
+The chokidar file watcher monitors markdown files and triggers sync operations:
+- **On file add**: Auto-sync if matches pattern
+- **On file change**: Debounced sync (3 second delay) if previously synced or matches pattern
+- **On file delete**: Remove from context system if previously synced
+
+**Important**: The watcher ignores `.cospec-sync/**` to prevent infinite loops.
+
+### Sync Lifecycle
+
+1. **Initial Load**: `fileSyncManager.initialize()` loads existing sync state from metadata file
+2. **File Change Detected**: Watcher triggers `handleFileChange()` with debouncing
+3. **Sync Execution**: `syncFile()` calls Kai context API to create/update memory
+4. **Metadata Update**: `saveMetadata()` persists sync state without modifying original file
+5. **No Loop**: Metadata writes to `.cospec-sync/` don't trigger watcher (ignored directory)
+
+### Troubleshooting
+
+**Issue**: Infinite sync loop (file keeps syncing repeatedly)
+- **Cause**: Watcher not ignoring `.cospec-sync/` directory
+- **Fix**: Verify `watchOptions.ignored` includes `'**/.cospec-sync/**'` in `index.js`
+
+**Issue**: Sync state lost after container restart
+- **Cause**: `.cospec-sync/` directory not persisted
+- **Fix**: Ensure `MARKDOWN_DIR` volume mount includes the `.cospec-sync/` subdirectory
+
+**Issue**: Files not auto-syncing
+- **Cause**: File path doesn't match any auto-sync pattern
+- **Fix**: Use manual sync API or add pattern to `DEFAULT_SYNC_PATTERNS` in `fileSyncManager.js`
+
+### Design Principles
+
+1. **No File Pollution**: Original markdown files are never modified for sync purposes
+2. **Separation of Concerns**: Sync metadata stored in dedicated hidden directory
+3. **Idempotency**: Multiple syncs of same file content result in update, not duplicate
+4. **Debouncing**: File changes are debounced to avoid excessive API calls during editing
+5. **Graceful Degradation**: If Kai backend is unavailable, sync fails gracefully without breaking editor

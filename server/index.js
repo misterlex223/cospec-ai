@@ -277,7 +277,8 @@ const setupWatcher = async () => {
     persistent: true,
     ignored: [
       /(^|[\/\\])\../, // 忽略隱藏文件
-      '**/node_modules/**' // 忽略 node_modules 目錄
+      '**/node_modules/**', // 忽略 node_modules 目錄
+      '**/.cospec-sync/**' // 忽略 CoSpec 同步元數據目錄
     ]
   };
 
