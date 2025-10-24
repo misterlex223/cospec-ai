@@ -27,6 +27,7 @@ class KaiContextClient {
 
   /**
    * Create or update a memory in Kai's context system
+   * Uses upsert endpoint to prevent duplicates
    */
   async createOrUpdateMemory(filePath, content, metadata = {}) {
     if (!this.enabled) {
@@ -51,23 +52,15 @@ class KaiContextClient {
         },
       };
 
-      // Check if memory exists by file path
-      const existingMemory = await this.getMemoryByFilePath(filePath);
+      // Use upsert endpoint to automatically handle create or update
+      const response = await this.client.put(
+        '/api/context/memories/upsert?uniqueKey=filePath',
+        memoryData
+      );
 
-      if (existingMemory) {
-        // Update existing memory
-        const response = await this.client.put(
-          `/api/context/memories/${existingMemory.id}`,
-          memoryData
-        );
-        console.log(`[KaiContext] Updated memory for ${filePath}`);
-        return response.data;
-      } else {
-        // Create new memory
-        const response = await this.client.post('/api/context/memories', memoryData);
-        console.log(`[KaiContext] Created memory for ${filePath}: ${response.data.id}`);
-        return response.data;
-      }
+      const action = response.status === 201 ? 'Created' : 'Updated';
+      console.log(`[KaiContext] ${action} memory for ${filePath}: ${response.data.id}`);
+      return response.data;
     } catch (error) {
       console.error(`[KaiContext] Failed to sync ${filePath}:`, error.message);
       if (error.response) {
