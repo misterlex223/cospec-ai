@@ -445,6 +445,90 @@ app.get('/api/files/:path(*)', async (req, res) => {
   }
 });
 
+// ============================================================================
+// Context System Integration Routes (MUST be before wildcard routes)
+// ============================================================================
+
+const fileSyncManager = require('./fileSyncManager');
+const kaiContextClient = require('./kaiContextClient');
+
+// POST /api/files/:path/sync-to-context - Manually mark file for sync
+app.post('/api/files/:path(*)/sync-to-context', authenticateToken, async (req, res) => {
+  try {
+    console.log('[ContextSync] Received sync request for path:', req.params.path);
+    const filePath = sanitizePath(req.params.path);
+    console.log('[ContextSync] Sanitized path:', filePath);
+    const fullPath = path.join(MARKDOWN_DIR, filePath);
+    console.log('[ContextSync] Full path:', fullPath);
+
+    // Check if file exists
+    try {
+      await fs.access(fullPath);
+    } catch (error) {
+      console.error('[ContextSync] File not found:', fullPath);
+      return res.status(404).json({ error: `File not found: ${filePath}` });
+    }
+
+    // Read file content
+    const content = await fs.readFile(fullPath, 'utf-8');
+    console.log('[ContextSync] File content length:', content.length);
+
+    // Sync to context
+    const result = await fileSyncManager.markForSync(filePath, content);
+    console.log('[ContextSync] Sync result:', result);
+
+    res.json(result);
+  } catch (error) {
+    console.error('[ContextSync] Failed to mark file for sync:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// DELETE /api/files/:path/sync-to-context - Unmark file from sync
+app.delete('/api/files/:path(*)/sync-to-context', authenticateToken, async (req, res) => {
+  try {
+    const filePath = sanitizePath(req.params.path);
+    const result = await fileSyncManager.unmarkFromSync(filePath);
+    res.json(result);
+  } catch (error) {
+    console.error('[ContextSync] Failed to unmark file from sync:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// GET /api/files/:path/sync-status - Get sync status
+app.get('/api/files/:path(*)/sync-status', async (req, res) => {
+  try {
+    const filePath = sanitizePath(req.params.path);
+    const status = fileSyncManager.getSyncStatus(filePath);
+    res.json(status);
+  } catch (error) {
+    console.error('[ContextSync] Failed to get sync status:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// GET /api/context-config - Get context configuration
+app.get('/api/context-config', async (req, res) => {
+  try {
+    const healthy = await kaiContextClient.healthCheck();
+    res.json({
+      enabled: kaiContextClient.enabled,
+      healthy,
+      projectId: kaiContextClient.projectId,
+      patterns: fileSyncManager.getPatterns(),
+      syncedFiles: fileSyncManager.getAllSyncedFiles(),
+    });
+  } catch (error) {
+    console.error('[ContextSync] Failed to get config:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ============================================================================
+// File CRUD Routes (General wildcard routes - MUST be after specific routes)
+// ============================================================================
+
 // 功能項目: 2.2.2 保存文件內容
 app.post('/api/files/:path(*)', authenticateToken, async (req, res) => {
   try {
@@ -629,85 +713,6 @@ app.patch('/api/files/:path(*)', authenticateToken, async (req, res) => {
     res.json({ success: true, oldPath: sanitizedOldPath, newPath: sanitizedNewPath });
   } catch (error) {
     console.error('Error renaming file:', error);
-    res.status(500).json({ error: error.message });
-  }
-});
-
-// ============================================================================
-// Context System Integration Routes
-// ============================================================================
-
-const fileSyncManager = require('./fileSyncManager');
-const kaiContextClient = require('./kaiContextClient');
-
-// POST /api/files/:path/sync-to-context - Manually mark file for sync
-app.post('/api/files/:path(*)/sync-to-context', authenticateToken, async (req, res) => {
-  try {
-    console.log('[ContextSync] Received sync request for path:', req.params.path);
-    const filePath = sanitizePath(req.params.path);
-    console.log('[ContextSync] Sanitized path:', filePath);
-    const fullPath = path.join(MARKDOWN_DIR, filePath);
-    console.log('[ContextSync] Full path:', fullPath);
-
-    // Check if file exists
-    try {
-      await fs.access(fullPath);
-    } catch (error) {
-      console.error('[ContextSync] File not found:', fullPath);
-      return res.status(404).json({ error: `File not found: ${filePath}` });
-    }
-
-    // Read file content
-    const content = await fs.readFile(fullPath, 'utf-8');
-    console.log('[ContextSync] File content length:', content.length);
-
-    // Sync to context
-    const result = await fileSyncManager.markForSync(filePath, content);
-    console.log('[ContextSync] Sync result:', result);
-
-    res.json(result);
-  } catch (error) {
-    console.error('[ContextSync] Failed to mark file for sync:', error);
-    res.status(500).json({ error: error.message });
-  }
-});
-
-// DELETE /api/files/:path/sync-to-context - Unmark file from sync
-app.delete('/api/files/:path(*)/sync-to-context', authenticateToken, async (req, res) => {
-  try {
-    const filePath = sanitizePath(req.params.path);
-    const result = await fileSyncManager.unmarkFromSync(filePath);
-    res.json(result);
-  } catch (error) {
-    console.error('[ContextSync] Failed to unmark file from sync:', error);
-    res.status(500).json({ error: error.message });
-  }
-});
-
-// GET /api/files/:path/sync-status - Get sync status
-app.get('/api/files/:path(*)/sync-status', async (req, res) => {
-  try {
-    const filePath = sanitizePath(req.params.path);
-    const status = fileSyncManager.getSyncStatus(filePath);
-    res.json(status);
-  } catch (error) {
-    console.error('[ContextSync] Failed to get sync status:', error);
-    res.status(500).json({ error: error.message });
-  }
-});
-
-// GET /api/context-config - Get context configuration
-app.get('/api/context-config', async (req, res) => {
-  try {
-    const healthy = await kaiContextClient.healthCheck();
-    res.json({
-      enabled: kaiContextClient.enabled,
-      healthy,
-      projectId: kaiContextClient.projectId,
-      syncedFiles: fileSyncManager.getAllSyncedFiles(),
-    });
-  } catch (error) {
-    console.error('[ContextSync] Failed to get config:', error);
     res.status(500).json({ error: error.message });
   }
 });
