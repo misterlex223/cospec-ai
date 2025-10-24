@@ -643,14 +643,27 @@ const kaiContextClient = require('./kaiContextClient');
 // POST /api/files/:path/sync-to-context - Manually mark file for sync
 app.post('/api/files/:path(*)/sync-to-context', authenticateToken, async (req, res) => {
   try {
+    console.log('[ContextSync] Received sync request for path:', req.params.path);
     const filePath = sanitizePath(req.params.path);
+    console.log('[ContextSync] Sanitized path:', filePath);
     const fullPath = path.join(MARKDOWN_DIR, filePath);
+    console.log('[ContextSync] Full path:', fullPath);
+
+    // Check if file exists
+    try {
+      await fs.access(fullPath);
+    } catch (error) {
+      console.error('[ContextSync] File not found:', fullPath);
+      return res.status(404).json({ error: `File not found: ${filePath}` });
+    }
 
     // Read file content
     const content = await fs.readFile(fullPath, 'utf-8');
+    console.log('[ContextSync] File content length:', content.length);
 
     // Sync to context
     const result = await fileSyncManager.markForSync(filePath, content);
+    console.log('[ContextSync] Sync result:', result);
 
     res.json(result);
   } catch (error) {
