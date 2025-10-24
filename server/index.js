@@ -302,38 +302,73 @@ const setupWatcher = async () => {
 
   // 監聽文件變更並更新緩存，同時透過 WebSocket 通知客戶端
   watcher
-    .on('add', filePath => {
+    .on('add', async (filePath) => {
       console.log(`File ${filePath} has been added`);
       invalidateCache(); // 文件添加時使緩存失效
+
+      const relativePath = path.relative(MARKDOWN_DIR, filePath);
 
       // 向所有客戶端發送文件更新通知
       broadcastToClients({
         type: 'FILE_ADDED',
-        path: path.relative(MARKDOWN_DIR, filePath),
+        path: relativePath,
         timestamp: Date.now()
       });
+
+      // Context sync integration
+      try {
+        if (relativePath.endsWith('.md')) {
+          const content = await fs.readFile(filePath, 'utf-8');
+          fileSyncManager.handleFileChange(relativePath, content);
+        }
+      } catch (error) {
+        console.error('[ContextSync] Error on file add:', error);
+      }
     })
-    .on('change', filePath => {
+    .on('change', async (filePath) => {
       console.log(`File ${filePath} has been changed`);
       // 文件內容變更不需要使緩存失效，因為文件列表沒變
+
+      const relativePath = path.relative(MARKDOWN_DIR, filePath);
 
       // 向所有客戶端發送文件更新通知
       broadcastToClients({
         type: 'FILE_CHANGED',
-        path: path.relative(MARKDOWN_DIR, filePath),
+        path: relativePath,
         timestamp: Date.now()
       });
+
+      // Context sync integration
+      try {
+        if (relativePath.endsWith('.md')) {
+          const content = await fs.readFile(filePath, 'utf-8');
+          fileSyncManager.handleFileChange(relativePath, content);
+        }
+      } catch (error) {
+        console.error('[ContextSync] Error on file change:', error);
+      }
     })
-    .on('unlink', filePath => {
+    .on('unlink', (filePath) => {
       console.log(`File ${filePath} has been removed`);
       invalidateCache(); // 文件刪除時使緩存失效
+
+      const relativePath = path.relative(MARKDOWN_DIR, filePath);
 
       // 向所有客戶端發送文件更新通知
       broadcastToClients({
         type: 'FILE_DELETED',
-        path: path.relative(MARKDOWN_DIR, filePath),
+        path: relativePath,
         timestamp: Date.now()
       });
+
+      // Context sync integration
+      try {
+        if (relativePath.endsWith('.md')) {
+          fileSyncManager.handleFileDelete(relativePath);
+        }
+      } catch (error) {
+        console.error('[ContextSync] Error on file delete:', error);
+      }
     });
 
   // 初始化緩存
@@ -598,7 +633,76 @@ app.patch('/api/files/:path(*)', authenticateToken, async (req, res) => {
   }
 });
 
+// ============================================================================
+// Context System Integration Routes
+// ============================================================================
+
+const fileSyncManager = require('./fileSyncManager');
+const kaiContextClient = require('./kaiContextClient');
+
+// POST /api/files/:path/sync-to-context - Manually mark file for sync
+app.post('/api/files/:path(*)/sync-to-context', authenticateToken, async (req, res) => {
+  try {
+    const filePath = sanitizePath(req.params.path);
+    const fullPath = path.join(MARKDOWN_DIR, filePath);
+
+    // Read file content
+    const content = await fs.readFile(fullPath, 'utf-8');
+
+    // Sync to context
+    const result = await fileSyncManager.markForSync(filePath, content);
+
+    res.json(result);
+  } catch (error) {
+    console.error('[ContextSync] Failed to mark file for sync:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// DELETE /api/files/:path/sync-to-context - Unmark file from sync
+app.delete('/api/files/:path(*)/sync-to-context', authenticateToken, async (req, res) => {
+  try {
+    const filePath = sanitizePath(req.params.path);
+    const result = await fileSyncManager.unmarkFromSync(filePath);
+    res.json(result);
+  } catch (error) {
+    console.error('[ContextSync] Failed to unmark file from sync:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// GET /api/files/:path/sync-status - Get sync status
+app.get('/api/files/:path(*)/sync-status', async (req, res) => {
+  try {
+    const filePath = sanitizePath(req.params.path);
+    const status = fileSyncManager.getSyncStatus(filePath);
+    res.json(status);
+  } catch (error) {
+    console.error('[ContextSync] Failed to get sync status:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// GET /api/context-config - Get context configuration
+app.get('/api/context-config', async (req, res) => {
+  try {
+    const healthy = await kaiContextClient.healthCheck();
+    res.json({
+      enabled: kaiContextClient.enabled,
+      healthy,
+      projectId: kaiContextClient.projectId,
+      syncedFiles: fileSyncManager.getAllSyncedFiles(),
+    });
+  } catch (error) {
+    console.error('[ContextSync] Failed to get config:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ============================================================================
 // AI 功能 API 端點
+// ============================================================================
+
 const { Configuration, OpenAIApi } = require('openai');
 const { functionRegistry } = require('./functionRegistry');
 const Mem0Service = require('./mem0Service');
