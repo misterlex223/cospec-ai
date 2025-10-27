@@ -12,7 +12,7 @@ test('show welcome message', async ({ page }) => {
   await page.goto('/');
 
   // Check for welcome text
-  await expect(page.locator('text=Welcome to Vditor Markdown Editor')).toBeVisible();
+  await expect(page.locator('text=Welcome to CoSpec AI')).toBeVisible();
 });
 
 test('show sidebar with CoSpec AI', async ({ page }) => {

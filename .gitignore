@@ -7,3 +7,5 @@ work/
 figma-mocks/
 app-react/playwright-report/
 app-react/test-results/
+
+.kai-notify.json

@@ -874,6 +874,22 @@ app.post('/api/ai/functions', async (req, res) => {
   }
 });
 
+// 引入 Agent 路由和 AgentSocket
+const { router: agentRouter, setAgentSocket } = require('./agentRoutes');
+const AgentSocket = require('./agentSocket');
+
+// 創建 AgentSocket 實例
+const agentSocket = new AgentSocket(io);
+
+// 設置 Agent Socket
+setAgentSocket(agentSocket);
+
+// 將 AgentSocket 實例設置為全局變量，以便在其他模塊中使用
+global.agentSocket = agentSocket;
+
+// 註冊 Agent API 路由
+app.use('/api/agent', agentRouter);
+
 // 啟動服務器
 server.listen(PORT, async () => {
   console.log(`Server running on port ${PORT}`);

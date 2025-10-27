@@ -6,6 +6,7 @@ import { FileTree } from '../components/FileTree/FileTree';
 import { MarkdownEditor } from '../components/MarkdownEditor/MarkdownEditor';
 import { DirectoryViewer } from '../components/DirectoryViewer/DirectoryViewer';
 import { Navigator } from '../components/Navigator/Navigator';
+import { AgentManager } from '../components/AgentManager/AgentManager';
 import type { RootState } from '../store';
 
 export function EditorPage() {
@@ -99,11 +100,11 @@ export function EditorPage() {
   return (
     <div style={{ display: 'flex', flexDirection: 'row', width: '100%', height: '100vh', overflow: 'hidden' }}>
       {/* Sidebar - 使用直接的內聯樣式確保水平布局 */}
-      <div 
-        style={{ 
-          height: '100%', 
-          width: `${sidebarWidth}px`, 
-          minWidth: '200px', 
+      <div
+        style={{
+          height: '100%',
+          width: `${sidebarWidth}px`,
+          minWidth: '200px',
           maxWidth: '600px',
           borderRight: '1px solid #e2e8f0',
           overflowY: 'auto',
@@ -128,11 +129,11 @@ export function EditorPage() {
           <FileTree key={refreshKey} />
         </div>
       </div>
-      
+
       {/* 可拖曳的分隔線 - 使用直接的內聯樣式設定寬度 */}
-      <div 
+      <div
         className="bg-gray-300 hover:bg-blue-400 relative flex items-center justify-center"
-        style={{ 
+        style={{
           cursor: 'col-resize',
           width: '8px', /* 直接設定寬度為 8px */
           minWidth: '8px', /* 確保最小寬度 */
@@ -152,7 +153,7 @@ export function EditorPage() {
           </div>
         </div>
       </div>
-      
+
       {/* Main content */}
       <div style={{ flex: 1, height: '100%', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
         {/* 只在非目錄模式下顯示 Navigator */}
@@ -174,13 +175,16 @@ export function EditorPage() {
           ) : (
             <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <div style={{ textAlign: 'center' }}>
-                <h3 style={{ fontSize: '1.25rem', fontWeight: 600, marginBottom: '0.5rem' }}>Welcome to Vditor Markdown Editor</h3>
+                <h3 style={{ fontSize: '1.25rem', fontWeight: 600, marginBottom: '0.5rem' }}>Welcome to CoSpec AI</h3>
                 <p style={{ color: '#6b7280' }}>Select a file from the sidebar or create a new one.</p>
               </div>
             </div>
           )}
         </div>
       </div>
+
+      {/* Agent Manager */}
+      <AgentManager />
     </div>
   );
 }
