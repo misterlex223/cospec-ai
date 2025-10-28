@@ -8,6 +8,7 @@ const { glob } = require('glob');
 const chokidar = require('chokidar');
 const http = require('http');
 const { Server } = require('socket.io');
+const serveStatic = require('serve-static');
 // 引入 glob-gitignore 用於處理 .gitignore 過濾
 let globGitignore;
 try {
@@ -24,49 +25,43 @@ const io = new Server(server, {
     methods: ["GET", "POST"]
   }
 });
-const PORT = process.env.PORT || 3001;
+const PORT = process.env.PORT || 9280;
 
-// 處理 WebSocket 連線
-function handleWebSocket(request, socket, head) {
-  // 簡易的 WebSocket 握手實現
-  const GUID = '258EAFA5-E914-47DA-95CA-C5AB0DC85B11';
-  const key = request.headers['sec-websocket-key'];
-  const acceptKey = require('crypto')
-    .createHash('sha1')
-    .update(key + GUID)
-    .digest('base64');
+// Set up static file serving for the frontend build
+// Serve static files from the 'dist' directory (where the React app will be built)
+// In the containerized environment, this will be under app-react/dist
+const distPath = path.join(__dirname, '..', 'app-react', 'dist');
 
-  const headers = [
-    'HTTP/1.1 101 Switching Protocols',
-    'Upgrade: websocket',
-    'Connection: Upgrade',
-    `Sec-WebSocket-Accept: ${acceptKey}`,
-    '\r\n'
-  ].join('\r\n');
-
-  socket.write(headers);
-
-  // 將客戶端添加到列表
-  const client = { socket };
-  wsClients.push(client);
-
-  console.log(`WebSocket client connected, total clients: ${wsClients.length}`);
-
-  // 處理客戶端關閉
-  socket.on('close', () => {
-    const index = wsClients.findIndex(c => c.socket === socket);
-    if (index !== -1) {
-      wsClients.splice(index, 1);
-      console.log(`WebSocket client disconnected, remaining clients: ${wsClients.length}`);
-    }
-  });
-
-  // 處理錯誤
-  socket.on('error', (err) => {
-    console.error('WebSocket error:', err);
-    socket.terminate();
-  });
+// Check if dist directory exists synchronously
+try {
+  const stats = require('fs').statSync(distPath);
+  if (stats.isDirectory()) {
+    app.use(serveStatic(distPath));
+  } else {
+    console.warn('Warning: Frontend build directory not found at', distPath);
+    console.warn('Run `npm run build` in the app-react directory to build the frontend');
+  }
+} catch (err) {
+  console.warn('Warning: Frontend build directory not found at', distPath);
+  console.warn('Run `npm run build` in the app-react directory to build the frontend');
 }
+
+// For local development, also check the root dist directory
+const rootDistPath = path.join(__dirname, '..', 'dist');
+if (!require('fs').existsSync(distPath)) {
+  try {
+    const stats = require('fs').statSync(rootDistPath);
+    if (stats.isDirectory()) {
+      app.use(serveStatic(rootDistPath));
+      console.log('Using root dist directory for static files');
+    }
+  } catch (err) {
+    console.warn('Root dist directory also not found at', rootDistPath);
+  }
+}
+
+// Note: The WebSocket server is handled by Socket.IO, so we don't need the manual WebSocket handler
+// Socket.IO automatically sets up WebSocket connections on the same server port
 
 // 向所有 Socket.io 客戶端發送消息
 function broadcastToClients(message) {
@@ -724,8 +719,6 @@ app.patch('/api/files/:path(*)', authenticateToken, async (req, res) => {
 
 const { Configuration, OpenAIApi } = require('openai');
 const { functionRegistry } = require('./functionRegistry');
-const Mem0Service = require('./mem0Service');
-const mem0Service = new Mem0Service();
 
 // 初始化 OpenAI 配置
 let openai;
@@ -766,17 +759,7 @@ app.post('/api/ai/chat', async (req, res) => {
       return res.status(400).json({ error: 'Message is required' });
     }
 
-    // 檢索與當前對話相關的記憶
     let memoryContext = '';
-    try {
-      const memories = await mem0Service.searchMemories(message, 5);
-      if (memories.results && memories.results.length > 0) {
-        memoryContext = '根據之前的記憶：\n' + memories.results.map(mem => `- ${mem.content}`).join('\n') + '\n\n';
-      }
-    } catch (memError) {
-      console.error('Error retrieving memories:', memError.message);
-      // 如果記憶檢索失敗，繼續執行而不中斷流程
-    }
 
     // 如果沒有配置 OpenAI API 密鑰，返回模擬回應
     if (!openai) {
@@ -881,26 +864,8 @@ app.post('/api/ai/chat', async (req, res) => {
       aiResponse = choice.message.content || '';
     }
 
-    // 將對話內容保存到記憶中
-    try {
-      // 保存用戶消息到記憶
-      await mem0Service.addCategorizedMemory(message, 'user_query', {
-        filePath: filePath,
-        timestamp: new Date().toISOString(),
-        conversationId: 'current'
-      });
-
-      // 保存AI回應到記憶
-      await mem0Service.addCategorizedMemory(aiResponse, 'assistant_response', {
-        filePath: filePath,
-        timestamp: new Date().toISOString(),
-        conversationId: 'current',
-        toolCalls: toolCalls
-      });
-    } catch (memError) {
-      console.error('Error saving memories:', memError.message);
-      // 如果記憶保存失敗，繼續執行而不中斷流程
-    }
+    // Placeholder for future memory saving functionality
+    // Currently no memory system is used
 
     // Return AI response
     res.json({
@@ -994,6 +959,35 @@ app.post('/api/ai/functions', async (req, res) => {
   } catch (error) {
     console.error('Error in AI function:', error);
     res.status(500).json({ error: 'AI service error: ' + error.message });
+  }
+});
+
+// Catch-all route to serve the frontend for all non-API requests
+app.get('*', (req, res) => {
+  // Check if the path starts with /api or /ws (WebSocket)
+  if (req.path.startsWith('/api/') || req.path.startsWith('/ws/')) {
+    // If it's an API request, let it continue to 404
+    res.status(404).json({ error: 'API endpoint not found' });
+  } else {
+    // Otherwise, serve the frontend index.html
+    // Try app-react/dist first (containerized), then root dist (local development)
+    let indexPath = path.join(distPath, 'index.html');
+    if (!require('fs').existsSync(indexPath)) {
+      const rootIndexPath = path.join(__dirname, '..', 'dist', 'index.html');
+      if (require('fs').existsSync(rootIndexPath)) {
+        indexPath = rootIndexPath;
+      } else {
+        // If neither exists, send an error
+        return res.status(500).send('Frontend build not found. Please run build process.');
+      }
+    }
+    
+    res.sendFile(indexPath, (err) => {
+      if (err) {
+        // If there's an error serving index.html, send a simple response
+        res.status(500).send('Error loading the application');
+      }
+    });
   }
 });
 

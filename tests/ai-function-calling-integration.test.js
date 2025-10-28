@@ -4,7 +4,7 @@
 const axios = require('axios');
 
 describe('AI Function Calling Integration Tests', () => {
-  const BASE_URL = 'http://localhost:3001'; // Default server port
+  const BASE_URL = 'http://localhost:9281'; // Default server port for CoSpec AI API
   const API_KEY = 'demo-api-key'; // Default API key
 
   // Helper function to make authenticated requests

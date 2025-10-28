@@ -1,0 +1,95 @@
+{
+  "name": "cospec-ai",
+  "version": "1.0.0",
+  "description": "CoSpec AI - Integrated Markdown Editor with AI capabilities",
+  "main": "server/index.js",
+  "bin": {
+    "cospec-ai": "bin/cospec-ai.js"
+  },
+  "scripts": {
+    "start": "node server/index.js",
+    "dev": "concurrently \"npm run dev:server\" \"npm run dev:client\"",
+    "dev:server": "cd server && nodemon index.js",
+    "dev:client": "cd app-react && npm run dev",
+    "build": "node build-frontend.js",
+    "build:client": "cd app-react && npm run build",
+    "build:server": "echo 'Server does not need building'",
+    "prepublishOnly": "npm run build",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "markdown",
+    "editor",
+    "ai",
+    "collaboration",
+    "specifications"
+  ],
+  "author": "Unclemon / misterlex223",
+  "license": "MIT",
+  "dependencies": {
+    "@playwright/test": "^1.56.0",
+    "@radix-ui/react-icons": "^1.3.2",
+    "@radix-ui/react-slot": "^1.2.3",
+    "@reduxjs/toolkit": "^2.2.1",
+    "axios": "^1.12.2",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
+    "concurrently": "^9.1.0",
+    "express": "^4.21.2",
+    "glob": "^10.3.3",
+    "glob-gitignore": "^1.0.15",
+    "lucide-react": "^0.544.0",
+    "react": "^19.1.1",
+    "react-dom": "^19.1.1",
+    "react-markdown": "^10.1.0",
+    "react-redux": "^9.1.0",
+    "react-router-dom": "^7.9.2",
+    "react-toastify": "^10.0.5",
+    "serve-static": "^1.16.2",
+    "tailwind-merge": "^3.3.1",
+    "tailwindcss-animate": "^1.0.7",
+    "vditor": "^3.11.2",
+    "yargs": "^17.7.2",
+    "chokidar": "^3.5.3",
+    "cors": "^2.8.5",
+    "express-rate-limit": "^7.1.5",
+    "gray-matter": "^4.0.3",
+    "helmet": "^7.1.0",
+    "morgan": "^1.10.0",
+    "socket.io": "^4.7.2",
+    "openai": "^3.3.0"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.17.0",
+    "@playwright/test": "^1.49.0",
+    "@types/react": "^19.1.13",
+    "@types/react-dom": "^19.1.2",
+    "@vitejs/plugin-react": "^4.3.4",
+    "autoprefixer": "^10.4.20",
+    "eslint": "^9.17.0",
+    "eslint-plugin-react-hooks": "^5.0.0",
+    "eslint-plugin-react-refresh": "^0.4.16",
+    "globals": "^15.14.0",
+    "nodemon": "^3.0.1",
+    "postcss": "^8.4.32",
+    "tailwindcss": "^3.4.17",
+    "typescript": "^5.7.2",
+    "typescript-eslint": "^8.18.1",
+    "@types/node": "^22.10.2",
+    "vite": "^6.0.3"
+  },
+  "files": [
+    "bin/",
+    "server/",
+    "dist/",
+    "build-frontend.js"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/misterlex223/cospec-ai.git"
+  },
+  "bugs": {
+    "url": "https://github.com/misterlex223/cospec-ai/issues"
+  },
+  "homepage": "https://github.com/misterlex223/cospec-ai#readme"
+}

@@ -4,8 +4,20 @@ import { store } from '../store';
 
 const API_KEY = 'demo-api-key'; // In a real app, this would be securely stored
 
+// Determine the API base URL based on environment
+let baseURL = './api'; // Default to relative path for reverse proxy support
+
+// In production/standalone mode (when served from the unified server), use relative path
+if (import.meta.env.MODE === 'production') {
+  // Use relative path to match the unified server where API is at /api
+  baseURL = './api';
+} else {
+  // In development mode, use relative path (will be proxied by Vite)
+  baseURL = '/api';
+}
+
 const api = axios.create({
-  baseURL: './api', // Use relative path to support reverse proxy
+  baseURL: baseURL,
 });
 
 // Add request interceptor to include auth token

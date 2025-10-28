@@ -30,7 +30,7 @@ The CoSpec AI Markdown Editor is a containerized application that provides a Rea
 
 ### Containerization
 - **Docker**: Single container running both frontend and backend services
-- **Ports**: 3000 (frontend), 3001 (backend API)
+- **Ports**: 9280 (frontend), 9281 (backend API)
 - **Volume Mount**: Supports mounting local directory to `/markdown` for persistent file storage
 
 ## Development Commands
@@ -230,8 +230,8 @@ To verify the configuration works correctly:
 If deploying behind a different reverse proxy:
 
 1. **Ensure proxy routes match**:
-   - Frontend: `/your-path/*` → port 3000
-   - API: `/your-path/api/*` → port 3001
+   - Frontend: `/your-path/*` → port 9280
+   - API: `/your-path/api/*` → port 9281
 
 2. **No code changes needed**: The relative paths configuration works with any proxy path.
 

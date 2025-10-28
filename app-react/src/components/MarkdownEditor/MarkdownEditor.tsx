@@ -91,7 +91,7 @@ export function MarkdownEditor({ filePath, className }: MarkdownEditorProps) {
     }
 
     try {
-      if (vditorRef.current && vditorRef.current.element) {
+      if (vditorRef.current && (vditorRef.current as any).element) {
         try {
           vditorRef.current.destroy();
         } catch (error) {
@@ -107,7 +107,7 @@ export function MarkdownEditor({ filePath, className }: MarkdownEditorProps) {
 
       // 確保 DOM 元素存在且已經渲染
       console.log('Initializing Vditor with element:', editorRef.current);
-
+      
       // 使用 requestAnimationFrame 確保在下一幀渲染前執行
       return new Promise<void>((resolve, reject) => {
         requestAnimationFrame(() => {
@@ -304,7 +304,7 @@ export function MarkdownEditor({ filePath, className }: MarkdownEditorProps) {
 
     // 清理編輯器
     return () => {
-      if (vditorRef.current && vditorRef.current.element) {
+      if (vditorRef.current && (vditorRef.current as any).element) {
         try {
           vditorRef.current.destroy();
         } catch (error) {
@@ -394,7 +394,7 @@ export function MarkdownEditor({ filePath, className }: MarkdownEditorProps) {
           content={content}
           onUpdateContent={(newContent) => {
             setContent(newContent);
-            if (vditorRef.current && vditorRef.current.element) {
+            if (vditorRef.current && (vditorRef.current as any).element) {
               try {
                 vditorRef.current.setValue(newContent);
               } catch (error) {
@@ -410,7 +410,7 @@ export function MarkdownEditor({ filePath, className }: MarkdownEditorProps) {
           content={content}
           onUpdateContent={(newContent) => {
             setContent(newContent);
-            if (vditorRef.current && vditorRef.current.element) {
+            if (vditorRef.current && (vditorRef.current as any).element) {
               try {
                 vditorRef.current.setValue(newContent);
               } catch (error) {
@@ -427,7 +427,7 @@ export function MarkdownEditor({ filePath, className }: MarkdownEditorProps) {
         currentContent={content}
         onContentUpdate={(newContent) => {
           setContent(newContent);
-          if (vditorRef.current && vditorRef.current.element) {
+          if (vditorRef.current && (vditorRef.current as any).element) {
             try {
               vditorRef.current.setValue(newContent);
             } catch (error) {

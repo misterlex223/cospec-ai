@@ -1,4 +1,5 @@
-import { createSlice, createAsyncThunk, PayloadAction } from '@reduxjs/toolkit';
+import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
+import type { PayloadAction } from '@reduxjs/toolkit';
 import { contextApi } from '../../services/api';
 
 interface SyncStatus {
@@ -90,7 +91,7 @@ const contextSlice = createSlice({
         state.config = action.payload;
         // Update sync statuses from config
         if (action.payload.syncedFiles) {
-          action.payload.syncedFiles.forEach((file) => {
+          action.payload.syncedFiles.forEach((file: { filePath: string; memoryId: string; lastSync: string; status: string }) => {
             state.syncStatuses[file.filePath] = {
               status: file.status as SyncStatus['status'],
               memoryId: file.memoryId,

@@ -24,7 +24,7 @@ class WebSocketService {
       // 獲取當前主機和端口
       const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
       const host = window.location.hostname;
-      const port = window.location.port === '3000' ? '3001' : window.location.port; // 如果前端在 3000 端口，後端在 3001
+      const port = window.location.port || (window.location.protocol === 'https:' ? '443' : '80');
       
       const wsUrl = `${protocol}//${host}:${port}/ws`;
       console.log(`Connecting to WebSocket at ${wsUrl}`);

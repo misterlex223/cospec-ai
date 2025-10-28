@@ -1,7 +1,7 @@
 {
   "name": "cospec-ai-server",
   "version": "1.0.0",
-  "description": "Backend server for CoSpec AI Markdown Editor with mem0 integration",
+  "description": "Backend server for CoSpec AI Markdown Editor",
   "main": "index.js",
   "scripts": {
     "start": "node index.js",
