@@ -1,0 +1,65 @@
+{
+  "name": "API Development Profile",
+  "version": "1.0.0",
+  "description": "Profile for REST API development projects with specification and documentation requirements",
+  "documents": [
+    {
+      "name": "API Specification",
+      "path": "SPEC.md",
+      "description": "Main API specification document with endpoints, schemas, and authentication details",
+      "promptFile": "prompts/api-spec.md",
+      "promptText": "Generate a comprehensive REST API specification with endpoints, request/response schemas, authentication, and error handling",
+      "command": "echo 'Generated API Specification\n\n## Overview\nThis API provides RESTful endpoints for...\n\n## Authentication\nUse Bearer token authentication.\n\n## Endpoints\n\n### GET /api/resource\nReturns a list of resources.' > {filePath}"
+    },
+    {
+      "name": "README",
+      "path": "README.md",
+      "description": "Project README with setup instructions and overview",
+      "promptFile": "prompts/readme.md",
+      "promptText": "Generate a README with project overview, setup instructions, and usage examples",
+      "command": "echo '# API Project\n\n## Overview\nThis project provides a REST API for...\n\n## Setup\n```bash\nnpm install\nnpm start\n```\n\n## Usage\nRefer to SPEC.md for API documentation.' > {filePath}"
+    }
+  ],
+  "folders": [
+    {
+      "name": "Requirements",
+      "path": "requirements/",
+      "description": "Requirements documentation folder",
+      "documentType": "requirement",
+      "documents": [
+        {
+          "name": "Functional Requirements",
+          "path": "requirements/functional.md",
+          "description": "Functional requirements for the API",
+          "promptFile": "prompts/functional-requirements.md",
+          "promptText": "Generate functional requirements focusing on API capabilities and user stories",
+          "command": "echo '# Functional Requirements\n\n## User Stories\n- As a client, I want to retrieve resources via GET requests\n- As a client, I want to create resources via POST requests\n\n## Acceptance Criteria\n- API returns JSON responses\n- All endpoints require authentication' > {filePath}"
+        },
+        {
+          "name": "Non-Functional Requirements",
+          "path": "requirements/non-functional.md",
+          "description": "Non-functional requirements including performance and security",
+          "promptFile": "prompts/non-functional-requirements.md",
+          "promptText": "Generate non-functional requirements for performance, security, and scalability",
+          "command": "echo '# Non-Functional Requirements\n\n## Performance\n- API response time < 200ms\n- Support 1000 concurrent requests\n\n## Security\n- HTTPS only\n- Rate limiting enabled\n- Input validation on all endpoints' > {filePath}"
+        }
+      ]
+    },
+    {
+      "name": "Documentation",
+      "path": "docs/",
+      "description": "Additional documentation",
+      "documentType": "documentation",
+      "documents": [
+        {
+          "name": "Architecture",
+          "path": "docs/architecture.md",
+          "description": "System architecture documentation",
+          "promptFile": "prompts/architecture.md",
+          "promptText": "Generate architecture documentation with system diagrams and component descriptions",
+          "command": "echo '# Architecture\n\n## Overview\nThe API follows a layered architecture:\n\n## Components\n- **API Layer**: Express.js REST endpoints\n- **Business Logic**: Service layer\n- **Data Layer**: Database access\n\n## Technology Stack\n- Node.js + Express\n- PostgreSQL\n- Redis for caching' > {filePath}"
+        }
+      ]
+    }
+  ]
+}

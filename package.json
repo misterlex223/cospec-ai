@@ -8,13 +8,14 @@
   },
   "scripts": {
     "start": "node server/index.js",
-    "dev": "concurrently \"npm run dev:server\" \"npm run dev:client\"",
+    "dev": "concurrently \"pnpm run dev:server\" \"pnpm run dev:client\"",
     "dev:server": "cd server && nodemon index.js",
-    "dev:client": "cd app-react && npm run dev",
+    "dev:client": "cd app-react && pnpm run dev",
     "build": "node build-frontend.js",
-    "build:client": "cd app-react && npm run build",
+    "build:client": "cd app-react && pnpm run build",
     "build:server": "echo 'Server does not need building'",
-    "prepublishOnly": "npm run build",
+    "build:all": "pnpm run build:client && pnpm run build:server",
+    "prepublishOnly": "pnpm run build",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [

@@ -5,6 +5,7 @@ import { setFileList, setLoading, refreshFileList } from '../../store/slices/fil
 import { togglePathExpanded, expandPath } from '../../store/slices/uiSlice';
 import { addNotification } from '../../store/slices/notificationsSlice';
 import { syncFileToContext, unsyncFileFromContext, fetchSyncStatus } from '../../store/slices/contextSlice';
+import { generateFile } from '../../store/slices/profileSlice';
 import { fileApi, type FileInfo } from '../../services/api';
 import { cn } from '../../lib/utils';
 import { Button } from '../ui/button';
@@ -17,6 +18,14 @@ interface TreeNode {
   type: 'file' | 'directory';
   path: string;
   children?: TreeNode[];
+  exists?: boolean;
+  profileMetadata?: {
+    required: boolean;
+    documentName: string;
+    description: string;
+    hasPrompt: boolean;
+    hasCommand: boolean;
+  };
 }
 
 interface FileTreeProps {
@@ -247,6 +256,8 @@ function FileTreeComponent({ className }: FileTreeProps) {
           name: fileName,
           type: 'file',
           path: file.path,
+          exists: file.exists !== undefined ? file.exists : true,
+          profileMetadata: file.profileMetadata,
         };
 
         if (parentPath && directoryMap[parentPath]) {
@@ -364,6 +375,33 @@ const FileNode = memo(({ node, currentPath, expandedPaths, onFileClick, onDirect
     setShowContextMenu(false);
   };
 
+  const handleGenerateFile = async () => {
+    try {
+      dispatch(addNotification({
+        type: 'info',
+        message: `Generating ${node.name}...`,
+        title: 'File Generation'
+      }));
+      await dispatch(generateFile(node.path)).unwrap();
+      dispatch(addNotification({
+        type: 'success',
+        message: `Started generation for ${node.name}`,
+        title: 'Generation Started'
+      }));
+      // Refresh file list after a delay to allow generation to complete
+      setTimeout(() => {
+        dispatch(refreshFileList());
+      }, 2000);
+    } catch (error: any) {
+      dispatch(addNotification({
+        type: 'error',
+        message: error.message || 'Failed to generate file',
+        title: 'Generation Error'
+      }));
+    }
+    setShowContextMenu(false);
+  };
+
   useEffect(() => {
     const handleClick = () => setShowContextMenu(false);
     if (showContextMenu) {
@@ -416,15 +454,40 @@ const FileNode = memo(({ node, currentPath, expandedPaths, onFileClick, onDirect
       </div>
     );
   } else {
+    const isMissing = node.exists === false;
+    const isRequired = node.profileMetadata?.required;
+
     return (
       <>
         <div
-          className={`flex items-center cursor-pointer p-1 rounded ${currentPath === node.path ? 'bg-blue-100 dark:bg-blue-900' : 'hover:bg-gray-100 dark:hover:bg-gray-800'}`}
-          onClick={() => onFileClick(node.path)}
+          className={cn(
+            'flex items-center cursor-pointer p-1 rounded',
+            isMissing ? 'opacity-60' : '',
+            currentPath === node.path ? 'bg-blue-100 dark:bg-blue-900' : 'hover:bg-gray-100 dark:hover:bg-gray-800'
+          )}
+          onClick={() => !isMissing && onFileClick(node.path)}
           onContextMenu={handleContextMenu}
+          title={isRequired ? `Required by profile: ${node.profileMetadata?.documentName}\n${node.profileMetadata?.description}` : undefined}
         >
-          <span className="mr-2">📄</span>
-          <span className={currentPath === node.path ? 'font-semibold' : ''}>{node.name}</span>
+          <span className="mr-2">
+            {isMissing ? '⚠️' : '📄'}
+          </span>
+          <span className={cn(
+            currentPath === node.path ? 'font-semibold' : '',
+            isMissing ? 'text-gray-500 dark:text-gray-400' : ''
+          )}>
+            {node.name}
+          </span>
+          {isMissing && (
+            <span className="ml-2 text-xs px-1 py-0.5 bg-red-100 dark:bg-red-900 text-red-700 dark:text-red-300 rounded">
+              Missing
+            </span>
+          )}
+          {isRequired && !isMissing && (
+            <span className="ml-2 text-xs px-1 py-0.5 bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 rounded">
+              Required
+            </span>
+          )}
           {getSyncIcon() && (
             <span className={`ml-2 text-xs ${
               syncStatus?.status === 'synced' ? 'text-green-600' :
@@ -442,6 +505,20 @@ const FileNode = memo(({ node, currentPath, expandedPaths, onFileClick, onDirect
             className="fixed bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded shadow-lg z-50 py-1"
             style={{ left: `${menuPosition.x}px`, top: `${menuPosition.y}px` }}
           >
+            {/* Profile generation options */}
+            {isRequired && node.profileMetadata?.hasCommand && (
+              <>
+                <button
+                  className="w-full text-left px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 text-sm"
+                  onClick={handleGenerateFile}
+                >
+                  ⚡ {isMissing ? 'Generate from Profile' : 'Regenerate'}
+                </button>
+                <div className="border-t border-gray-200 dark:border-gray-700 my-1"></div>
+              </>
+            )}
+
+            {/* Context sync options */}
             {syncStatus?.status === 'synced' ? (
               <button
                 className="w-full text-left px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 text-sm"

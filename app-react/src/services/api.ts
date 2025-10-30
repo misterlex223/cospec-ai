@@ -60,6 +60,15 @@ api.interceptors.response.use(
 export interface FileInfo {
   path: string;
   content?: string;
+  name?: string;
+  exists?: boolean;
+  profileMetadata?: {
+    required: boolean;
+    documentName: string;
+    description: string;
+    hasPrompt: boolean;
+    hasCommand: boolean;
+  };
 }
 
 export const fileApi = {
@@ -179,4 +188,52 @@ export const contextApi = {
     const response = await api.get(`/files/${encodeURIComponent(path)}/sync-status`);
     return response.data;
   },
+};
+
+// Profile API
+import type {
+  ProfileResponse,
+  PromptContentResponse,
+  GenerationResponse,
+  ProfileValidation,
+} from '../types/profile';
+
+/**
+ * Fetch profile configuration
+ */
+export const fetchProfile = async (): Promise<ProfileResponse> => {
+  const response = await api.get('/profile');
+  return response.data;
+};
+
+/**
+ * Fetch required files from profile
+ */
+export const fetchProfileFiles = async (): Promise<any> => {
+  const response = await api.get('/profile/files');
+  return response.data;
+};
+
+/**
+ * Fetch prompt file content
+ */
+export const fetchPromptContent = async (filePath: string): Promise<PromptContentResponse> => {
+  const response = await api.get(`/profile/prompt/${encodeURIComponent(filePath)}`);
+  return response.data;
+};
+
+/**
+ * Generate file using profile command
+ */
+export const generateFile = async (filePath: string): Promise<GenerationResponse> => {
+  const response = await api.post(`/profile/generate/${encodeURIComponent(filePath)}`);
+  return response.data;
+};
+
+/**
+ * Validate profile configuration
+ */
+export const validateProfile = async (): Promise<ProfileValidation> => {
+  const response = await api.get('/profile/validate');
+  return response.data;
 };

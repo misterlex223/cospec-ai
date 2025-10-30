@@ -1,0 +1,834 @@
+/* Profile Editor - Modern CSS Layout */
+
+/* ============================================================================
+   Root Variables - Design System
+   ============================================================================ */
+
+/* Reset conflicting styles when in Profile Editor mode */
+.profile-editor-app ~ body,
+body:has(.profile-editor-app) {
+  overflow: auto !important;
+}
+
+body:has(.profile-editor-app) #root {
+  display: block !important;
+  flex-direction: unset !important;
+  height: auto !important;
+}
+
+.profile-editor-app * {
+  box-sizing: border-box;
+}
+
+:root {
+  /* Colors - Modern Blue/Gray Palette */
+  --pe-primary: #3b82f6;
+  --pe-primary-hover: #2563eb;
+  --pe-primary-light: #dbeafe;
+  --pe-secondary: #6b7280;
+  --pe-success: #10b981;
+  --pe-success-light: #d1fae5;
+  --pe-warning: #f59e0b;
+  --pe-warning-light: #fef3c7;
+  --pe-danger: #ef4444;
+  --pe-danger-hover: #dc2626;
+  --pe-danger-light: #fee2e2;
+
+  /* Backgrounds */
+  --pe-bg-primary: #ffffff;
+  --pe-bg-secondary: #f9fafb;
+  --pe-bg-tertiary: #f3f4f6;
+  --pe-bg-hover: #f9fafb;
+  --pe-bg-active: #e5e7eb;
+
+  /* Text Colors */
+  --pe-text-primary: #111827;
+  --pe-text-secondary: #6b7280;
+  --pe-text-tertiary: #9ca3af;
+  --pe-text-inverse: #ffffff;
+
+  /* Borders */
+  --pe-border-color: #e5e7eb;
+  --pe-border-hover: #d1d5db;
+  --pe-border-focus: #3b82f6;
+
+  /* Shadows */
+  --pe-shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  --pe-shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  --pe-shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+  --pe-shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+
+  /* Spacing */
+  --pe-space-xs: 0.25rem;
+  --pe-space-sm: 0.5rem;
+  --pe-space-md: 1rem;
+  --pe-space-lg: 1.5rem;
+  --pe-space-xl: 2rem;
+  --pe-space-2xl: 3rem;
+
+  /* Border Radius */
+  --pe-radius-sm: 0.375rem;
+  --pe-radius-md: 0.5rem;
+  --pe-radius-lg: 0.75rem;
+  --pe-radius-xl: 1rem;
+
+  /* Transitions */
+  --pe-transition-fast: 150ms ease-in-out;
+  --pe-transition-base: 200ms ease-in-out;
+  --pe-transition-slow: 300ms ease-in-out;
+}
+
+/* ============================================================================
+   Profile Editor App Container
+   ============================================================================ */
+.profile-editor-app {
+  min-height: 100vh;
+  height: 100vh;
+  width: 100vw;
+  background: var(--pe-bg-secondary);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  position: relative;
+}
+
+/* Header */
+.profile-editor-app header {
+  background: var(--pe-bg-primary);
+  border-bottom: 1px solid var(--pe-border-color);
+  box-shadow: var(--pe-shadow-sm);
+  padding: var(--pe-space-lg) var(--pe-space-xl);
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  flex-shrink: 0;
+}
+
+.profile-editor-app header h1 {
+  font-size: 1.875rem;
+  font-weight: 700;
+  color: var(--pe-text-primary);
+  margin: 0;
+  letter-spacing: -0.025em;
+}
+
+.profile-editor-app header p {
+  color: var(--pe-text-secondary);
+  font-size: 0.875rem;
+  margin: 0.25rem 0 0 0;
+}
+
+/* Main Content Area */
+.profile-editor-app main {
+  padding: 0;
+  width: 100%;
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+/* ============================================================================
+   Cards & Containers
+   ============================================================================ */
+.pe-card {
+  background: var(--pe-bg-primary);
+  border-radius: var(--pe-radius-lg);
+  box-shadow: var(--pe-shadow-md);
+  padding: var(--pe-space-xl);
+  transition: all var(--pe-transition-base);
+}
+
+.pe-card:hover {
+  box-shadow: var(--pe-shadow-lg);
+  transform: translateY(-2px);
+}
+
+.pe-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--pe-space-lg);
+  padding-bottom: var(--pe-space-md);
+  border-bottom: 2px solid var(--pe-bg-tertiary);
+}
+
+.pe-card-title {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: var(--pe-text-primary);
+  margin: 0;
+}
+
+.pe-card-body {
+  padding: var(--pe-space-md) 0;
+}
+
+/* ============================================================================
+   Buttons
+   ============================================================================ */
+.pe-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--pe-space-sm);
+  padding: 0.625rem 1.25rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  line-height: 1.25rem;
+  border-radius: var(--pe-radius-md);
+  border: none;
+  cursor: pointer;
+  transition: all var(--pe-transition-fast);
+  white-space: nowrap;
+  text-decoration: none;
+}
+
+.pe-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Primary Button */
+.pe-btn-primary {
+  background: var(--pe-primary);
+  color: var(--pe-text-inverse);
+  box-shadow: var(--pe-shadow-sm);
+}
+
+.pe-btn-primary:hover:not(:disabled) {
+  background: var(--pe-primary-hover);
+  box-shadow: var(--pe-shadow-md);
+  transform: translateY(-1px);
+}
+
+/* Secondary Button */
+.pe-btn-secondary {
+  background: var(--pe-bg-tertiary);
+  color: var(--pe-text-primary);
+}
+
+.pe-btn-secondary:hover:not(:disabled) {
+  background: var(--pe-bg-active);
+}
+
+/* Success Button */
+.pe-btn-success {
+  background: var(--pe-success);
+  color: var(--pe-text-inverse);
+}
+
+.pe-btn-success:hover:not(:disabled) {
+  background: #059669;
+  box-shadow: var(--pe-shadow-md);
+}
+
+/* Danger Button */
+.pe-btn-danger {
+  background: var(--pe-danger);
+  color: var(--pe-text-inverse);
+}
+
+.pe-btn-danger:hover:not(:disabled) {
+  background: var(--pe-danger-hover);
+}
+
+/* Icon Button */
+.pe-btn-icon {
+  padding: 0.5rem;
+  border-radius: var(--pe-radius-md);
+  background: transparent;
+  color: var(--pe-text-secondary);
+}
+
+.pe-btn-icon:hover:not(:disabled) {
+  background: var(--pe-bg-hover);
+  color: var(--pe-text-primary);
+}
+
+/* ============================================================================
+   Forms
+   ============================================================================ */
+.pe-form-group {
+  margin-bottom: var(--pe-space-lg);
+}
+
+.pe-label {
+  display: block;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--pe-text-primary);
+  margin-bottom: var(--pe-space-sm);
+}
+
+.pe-input,
+.pe-textarea,
+.pe-select {
+  width: 100%;
+  padding: 0.625rem 0.875rem;
+  font-size: 0.875rem;
+  line-height: 1.5;
+  color: var(--pe-text-primary);
+  background: var(--pe-bg-primary);
+  border: 1px solid var(--pe-border-color);
+  border-radius: var(--pe-radius-md);
+  transition: all var(--pe-transition-fast);
+}
+
+.pe-input:focus,
+.pe-textarea:focus,
+.pe-select:focus {
+  outline: none;
+  border-color: var(--pe-border-focus);
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+.pe-input::placeholder,
+.pe-textarea::placeholder {
+  color: var(--pe-text-tertiary);
+}
+
+.pe-textarea {
+  min-height: 100px;
+  resize: vertical;
+  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+}
+
+.pe-input-help {
+  display: block;
+  margin-top: var(--pe-space-xs);
+  font-size: 0.75rem;
+  color: var(--pe-text-secondary);
+}
+
+/* ============================================================================
+   Profile Browser Layout
+   ============================================================================ */
+.pe-browser-container {
+  max-width: 1800px;
+  margin: 0 auto;
+  padding: var(--pe-space-2xl) var(--pe-space-xl);
+}
+
+.pe-profile-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(400px, 1fr));
+  gap: var(--pe-space-xl);
+  margin-top: 0;
+}
+
+.pe-profile-item {
+  background: var(--pe-bg-primary);
+  border-radius: var(--pe-radius-lg);
+  padding: var(--pe-space-xl);
+  box-shadow: var(--pe-shadow-md);
+  transition: all var(--pe-transition-base);
+  border: 2px solid transparent;
+}
+
+.pe-profile-item:hover {
+  box-shadow: var(--pe-shadow-lg);
+  transform: translateY(-2px);
+  border-color: var(--pe-primary);
+}
+
+.pe-profile-item-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-bottom: var(--pe-space-md);
+}
+
+.pe-profile-item-title {
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: var(--pe-text-primary);
+  margin: 0;
+}
+
+.pe-profile-item-desc {
+  font-size: 0.8125rem;
+  color: var(--pe-text-secondary);
+  margin: var(--pe-space-sm) 0;
+  line-height: 1.5;
+}
+
+.pe-profile-item-actions {
+  display: flex;
+  gap: var(--pe-space-sm);
+  margin-top: var(--pe-space-lg);
+  padding-top: var(--pe-space-lg);
+  border-top: 1px solid var(--pe-border-color);
+}
+
+/* ============================================================================
+   Badges
+   ============================================================================ */
+.pe-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.25rem 0.75rem;
+  font-size: 0.75rem;
+  font-weight: 500;
+  border-radius: 9999px;
+  line-height: 1;
+}
+
+.pe-badge-success {
+  background: var(--pe-success-light);
+  color: #065f46;
+}
+
+.pe-badge-warning {
+  background: var(--pe-warning-light);
+  color: #92400e;
+}
+
+.pe-badge-danger {
+  background: var(--pe-danger-light);
+  color: #991b1b;
+}
+
+.pe-badge-primary {
+  background: var(--pe-primary-light);
+  color: #1e40af;
+}
+
+.pe-badge-secondary {
+  background: var(--pe-bg-tertiary);
+  color: var(--pe-text-secondary);
+}
+
+/* ============================================================================
+   Collapsible Sections (Document/Folder Lists)
+   ============================================================================ */
+.pe-collapsible {
+  background: var(--pe-bg-primary);
+  border: 1px solid var(--pe-border-color);
+  border-radius: var(--pe-radius-md);
+  margin-bottom: var(--pe-space-md);
+  overflow: hidden;
+  transition: all var(--pe-transition-base);
+}
+
+.pe-collapsible:hover {
+  border-color: var(--pe-border-hover);
+  box-shadow: var(--pe-shadow-sm);
+}
+
+.pe-collapsible-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--pe-space-md);
+  background: var(--pe-bg-secondary);
+  cursor: pointer;
+  transition: all var(--pe-transition-fast);
+  user-select: none;
+}
+
+.pe-collapsible-header:hover {
+  background: var(--pe-bg-tertiary);
+}
+
+.pe-collapsible-header-content {
+  display: flex;
+  align-items: center;
+  gap: var(--pe-space-md);
+  flex: 1;
+}
+
+.pe-collapsible-header-icon {
+  color: var(--pe-text-secondary);
+  flex-shrink: 0;
+}
+
+.pe-collapsible-header-text {
+  flex: 1;
+}
+
+.pe-collapsible-header-title {
+  font-weight: 500;
+  color: var(--pe-text-primary);
+  margin: 0;
+  font-size: 0.9375rem;
+}
+
+.pe-collapsible-header-subtitle {
+  font-size: 0.8125rem;
+  color: var(--pe-text-secondary);
+  margin: 0.125rem 0 0 0;
+}
+
+.pe-collapsible-body {
+  padding: var(--pe-space-lg);
+  background: var(--pe-bg-primary);
+}
+
+/* ============================================================================
+   Empty States
+   ============================================================================ */
+.pe-empty-state {
+  text-align: center;
+  padding: var(--pe-space-2xl);
+  color: var(--pe-text-secondary);
+}
+
+.pe-empty-state-icon {
+  font-size: 3rem;
+  margin-bottom: var(--pe-space-md);
+  opacity: 0.5;
+}
+
+.pe-empty-state-title {
+  font-size: 1.125rem;
+  font-weight: 500;
+  color: var(--pe-text-primary);
+  margin-bottom: var(--pe-space-sm);
+}
+
+.pe-empty-state-description {
+  font-size: 0.875rem;
+  margin-bottom: var(--pe-space-lg);
+}
+
+/* ============================================================================
+   Alerts & Notifications
+   ============================================================================ */
+.pe-alert {
+  padding: var(--pe-space-md) var(--pe-space-lg);
+  border-radius: var(--pe-radius-md);
+  border-left: 4px solid;
+  margin-bottom: var(--pe-space-lg);
+}
+
+.pe-alert-success {
+  background: var(--pe-success-light);
+  border-color: var(--pe-success);
+  color: #065f46;
+}
+
+.pe-alert-warning {
+  background: var(--pe-warning-light);
+  border-color: var(--pe-warning);
+  color: #92400e;
+}
+
+.pe-alert-danger {
+  background: var(--pe-danger-light);
+  border-color: var(--pe-danger);
+  color: #991b1b;
+}
+
+.pe-alert-info {
+  background: var(--pe-primary-light);
+  border-color: var(--pe-primary);
+  color: #1e40af;
+}
+
+/* ============================================================================
+   Loading States
+   ============================================================================ */
+.pe-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--pe-space-xl);
+  color: var(--pe-text-secondary);
+}
+
+.pe-spinner {
+  display: inline-block;
+  width: 2rem;
+  height: 2rem;
+  border: 3px solid var(--pe-bg-tertiary);
+  border-top-color: var(--pe-primary);
+  border-radius: 50%;
+  animation: pe-spin 0.8s linear infinite;
+}
+
+@keyframes pe-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* ============================================================================
+   Profile Editor Page Layout
+   ============================================================================ */
+.pe-editor-container {
+  max-width: 100%;
+  width: 100%;
+}
+
+.pe-editor-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--pe-space-xl);
+  background: var(--pe-bg-primary);
+  border-bottom: 1px solid var(--pe-border-color);
+  box-shadow: var(--pe-shadow-sm);
+  position: sticky;
+  top: 0;
+  z-index: 40;
+  margin: 0;
+}
+
+.pe-editor-header-content {
+  max-width: 1800px;
+  margin: 0 auto;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.pe-editor-header-left {
+  display: flex;
+  align-items: center;
+  gap: var(--pe-space-lg);
+}
+
+.pe-editor-title {
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: var(--pe-text-primary);
+  margin: 0;
+}
+
+.pe-editor-dirty {
+  font-size: 0.875rem;
+  color: var(--pe-warning);
+  margin-top: 0.25rem;
+}
+
+.pe-editor-content {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--pe-space-2xl);
+  align-items: start;
+  max-width: 1800px;
+  margin: 0 auto;
+  padding: var(--pe-space-2xl) var(--pe-space-xl);
+}
+
+.pe-editor-section {
+  background: var(--pe-bg-primary);
+  border-radius: var(--pe-radius-lg);
+  box-shadow: var(--pe-shadow-md);
+  padding: var(--pe-space-xl);
+  height: fit-content;
+}
+
+.pe-editor-section-title {
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: var(--pe-text-primary);
+  margin: 0 0 var(--pe-space-lg) 0;
+  padding-bottom: var(--pe-space-md);
+  border-bottom: 2px solid var(--pe-bg-tertiary);
+}
+
+.pe-editor-section-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--pe-space-lg);
+}
+
+/* Two Column Form Layout */
+.pe-form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--pe-space-lg);
+  margin-bottom: var(--pe-space-lg);
+}
+
+.pe-form-row-full {
+  grid-column: 1 / -1;
+}
+
+/* ============================================================================
+   Responsive Design
+   ============================================================================ */
+@media (max-width: 1400px) {
+  .pe-editor-content {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 1200px) {
+  .pe-form-row {
+    grid-template-columns: 1fr;
+  }
+
+  .pe-profile-grid {
+    grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+  }
+}
+
+@media (max-width: 768px) {
+  .pe-browser-container {
+    padding: var(--pe-space-lg) var(--pe-space-md);
+  }
+
+  .pe-editor-content {
+    padding: var(--pe-space-lg) var(--pe-space-md);
+  }
+
+  .pe-card {
+    padding: var(--pe-space-lg);
+  }
+
+  .pe-profile-grid {
+    grid-template-columns: 1fr;
+    gap: var(--pe-space-lg);
+  }
+
+  .pe-card-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--pe-space-md);
+  }
+
+  .pe-profile-item-actions {
+    flex-wrap: wrap;
+  }
+
+  .profile-editor-app header {
+    padding: var(--pe-space-md) var(--pe-space-lg);
+  }
+
+  .profile-editor-app header h1 {
+    font-size: 1.5rem;
+  }
+
+  .pe-editor-header {
+    padding: var(--pe-space-md);
+  }
+
+  .pe-editor-header-content {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--pe-space-md);
+  }
+
+  .pe-editor-header-left {
+    width: 100%;
+    gap: var(--pe-space-md);
+  }
+
+  .pe-editor-title {
+    font-size: 1.25rem;
+  }
+
+  .pe-editor-content {
+    grid-template-columns: 1fr;
+    gap: var(--pe-space-lg);
+  }
+
+  .pe-editor-section {
+    padding: var(--pe-space-lg);
+  }
+
+  .pe-btn {
+    width: 100%;
+  }
+
+  .pe-editor-header .pe-btn {
+    width: 100%;
+  }
+}
+
+/* ============================================================================
+   Utilities
+   ============================================================================ */
+.pe-flex {
+  display: flex;
+}
+
+.pe-flex-col {
+  flex-direction: column;
+}
+
+.pe-items-center {
+  align-items: center;
+}
+
+.pe-justify-between {
+  justify-content: space-between;
+}
+
+.pe-gap-sm {
+  gap: var(--pe-space-sm);
+}
+
+.pe-gap-md {
+  gap: var(--pe-space-md);
+}
+
+.pe-gap-lg {
+  gap: var(--pe-space-lg);
+}
+
+.pe-mb-sm {
+  margin-bottom: var(--pe-space-sm);
+}
+
+.pe-mb-md {
+  margin-bottom: var(--pe-space-md);
+}
+
+.pe-mb-lg {
+  margin-bottom: var(--pe-space-lg);
+}
+
+.pe-mt-md {
+  margin-top: var(--pe-space-md);
+}
+
+.pe-mt-lg {
+  margin-top: var(--pe-space-lg);
+}
+
+.pe-text-sm {
+  font-size: 0.875rem;
+}
+
+.pe-text-xs {
+  font-size: 0.75rem;
+}
+
+.pe-font-mono {
+  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+}
+
+.pe-truncate {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ============================================================================
+   Dark Mode Support (Optional)
+   ============================================================================ */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --pe-bg-primary: #1f2937;
+    --pe-bg-secondary: #111827;
+    --pe-bg-tertiary: #374151;
+    --pe-bg-hover: #374151;
+    --pe-bg-active: #4b5563;
+
+    --pe-text-primary: #f9fafb;
+    --pe-text-secondary: #d1d5db;
+    --pe-text-tertiary: #9ca3af;
+
+    --pe-border-color: #374151;
+    --pe-border-hover: #4b5563;
+  }
+
+  .profile-editor-app {
+    background: var(--pe-bg-secondary);
+  }
+}

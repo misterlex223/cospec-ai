@@ -69,7 +69,8 @@ function broadcastToClients(message) {
 }
 
 // 功能項目: 1.1.3 設定環境變數
-const MARKDOWN_DIR = process.env.MARKDOWN_DIR || '/markdown';
+// Use relative path for development, absolute path for Docker
+const MARKDOWN_DIR = process.env.MARKDOWN_DIR || path.join(__dirname, '..', 'markdown');
 
 const rateLimit = require('express-rate-limit');
 const helmet = require('helmet');
@@ -387,7 +388,13 @@ app.get('/api/files', async (req, res) => {
     }
 
     // 使用緩存機制獲取文件列表
-    const files = await getFileList();
+    let files = await getFileList();
+
+    // Annotate files with profile metadata if profile is loaded
+    if (profileManager.isLoaded()) {
+      files = await profileManager.annotateFiles(files, MARKDOWN_DIR);
+    }
+
     res.json(files);
   } catch (error) {
     console.error('Error fetching files:', error);
@@ -447,6 +454,7 @@ app.get('/api/files/:path(*)', async (req, res) => {
 
 const fileSyncManager = require('./fileSyncManager');
 const kaiContextClient = require('./kaiContextClient');
+const profileManager = require('./profileManager');
 
 // POST /api/files/:path/sync-to-context - Manually mark file for sync
 app.post('/api/files/:path(*)/sync-to-context', authenticateToken, async (req, res) => {
@@ -517,6 +525,354 @@ app.get('/api/context-config', async (req, res) => {
     });
   } catch (error) {
     console.error('[ContextSync] Failed to get config:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ============================================================================
+// Configuration API Routes
+// ============================================================================
+
+// GET /api/config - Get application configuration
+app.get('/api/config', (req, res) => {
+  res.json({
+    profileEditorMode: process.env.PROFILE_EDITOR_MODE === 'true',
+    profileName: process.env.PROFILE_NAME || null,
+  });
+});
+
+// ============================================================================
+// Profile API Routes
+// ============================================================================
+
+// GET /api/profile - Get loaded profile configuration
+app.get('/api/profile', async (req, res) => {
+  try {
+    if (!profileManager.isLoaded()) {
+      return res.json({ profile: null });
+    }
+
+    const profile = profileManager.getProfile();
+    res.json({
+      profile,
+      profileName: profileManager.getProfileName(),
+      profilePath: profileManager.getProfilePath(),
+    });
+  } catch (error) {
+    console.error('Failed to get profile:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// GET /api/profile/files - Get required files with existence status
+app.get('/api/profile/files', async (req, res) => {
+  try {
+    if (!profileManager.isLoaded()) {
+      return res.json({ files: [] });
+    }
+
+    const files = await getFileList();
+    const annotatedFiles = await profileManager.annotateFiles(files, MARKDOWN_DIR);
+
+    // Filter to only required files
+    const requiredFiles = annotatedFiles.filter(f => f.profileMetadata?.required);
+
+    res.json({ files: requiredFiles });
+  } catch (error) {
+    console.error('Failed to get profile files:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// GET /api/profile/prompt/:path(*) - Get prompt file content
+app.get('/api/profile/prompt/:path(*)', async (req, res) => {
+  try {
+    if (!profileManager.isLoaded()) {
+      return res.status(404).json({ error: 'No profile loaded' });
+    }
+
+    const filePath = sanitizePath(req.params.path);
+    const doc = profileManager.getDocumentByPath(filePath);
+
+    if (!doc || !doc.promptFile) {
+      return res.status(404).json({ error: 'Prompt file not found for document' });
+    }
+
+    const promptFilePath = profileManager.resolvePromptFile(doc.promptFile);
+
+    try {
+      const content = await fs.readFile(promptFilePath, 'utf-8');
+      res.json({
+        path: doc.promptFile,
+        absolutePath: promptFilePath,
+        content,
+      });
+    } catch (err) {
+      return res.status(404).json({ error: `Prompt file not found: ${doc.promptFile}` });
+    }
+  } catch (error) {
+    console.error('Failed to get prompt content:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// POST /api/profile/generate/:path(*) - Generate file using profile command
+app.post('/api/profile/generate/:path(*)', authenticateToken, async (req, res) => {
+  try {
+    if (!profileManager.isLoaded()) {
+      return res.status(404).json({ error: 'No profile loaded' });
+    }
+
+    const filePath = sanitizePath(req.params.path);
+    const context = profileManager.getGenerationContext(filePath);
+
+    if (!context.command) {
+      return res.status(400).json({ error: 'No generation command defined for this document' });
+    }
+
+    const targetPath = path.join(MARKDOWN_DIR, filePath);
+    const targetDir = path.dirname(targetPath);
+
+    // Ensure target directory exists
+    await fs.mkdir(targetDir, { recursive: true });
+
+    // Build command with variable substitution
+    let command = context.command
+      .replace(/{filePath}/g, targetPath)
+      .replace(/{promptText}/g, context.promptText || '');
+
+    if (context.promptFile) {
+      command = command.replace(/{promptFile}/g, context.promptFile);
+    }
+
+    console.log(`[ProfileGen] Executing command for ${filePath}:`, command);
+
+    // Execute command
+    const { spawn } = require('child_process');
+    const child = spawn(command, [], {
+      shell: true,
+      cwd: MARKDOWN_DIR,
+    });
+
+    const outputBuffer = [];
+
+    child.stdout.on('data', (data) => {
+      const output = data.toString();
+      outputBuffer.push(output);
+      io.emit('generation-output', { path: filePath, output, isError: false });
+    });
+
+    child.stderr.on('data', (data) => {
+      const output = data.toString();
+      outputBuffer.push(output);
+      io.emit('generation-output', { path: filePath, output, isError: true });
+    });
+
+    child.on('close', async (code) => {
+      const success = code === 0;
+      console.log(`[ProfileGen] Command finished with code ${code} for ${filePath}`);
+
+      io.emit('generation-complete', {
+        path: filePath,
+        success,
+        output: outputBuffer.join(''),
+        exitCode: code,
+      });
+
+      if (success) {
+        // Invalidate cache and notify clients
+        invalidateCache();
+        broadcastToClients({
+          type: 'file-added',
+          path: filePath,
+        });
+      }
+    });
+
+    child.on('error', (err) => {
+      console.error(`[ProfileGen] Command error for ${filePath}:`, err);
+      io.emit('generation-complete', {
+        path: filePath,
+        success: false,
+        error: err.message,
+      });
+    });
+
+    res.json({ success: true, message: 'Generation started' });
+  } catch (error) {
+    console.error('Failed to generate file:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// GET /api/profile/validate - Validate profile configuration
+app.get('/api/profile/validate', async (req, res) => {
+  try {
+    if (!profileManager.isLoaded()) {
+      return res.status(404).json({ error: 'No profile loaded' });
+    }
+
+    const profile = profileManager.getProfile();
+    const validation = await profileManager.validateProfile(profile);
+
+    res.json(validation);
+  } catch (error) {
+    console.error('Failed to validate profile:', error);
+    res.status(500).json({
+      valid: false,
+      errors: [error.message],
+      warnings: [],
+    });
+  }
+});
+
+// ============================================================================
+// Profile Management API Routes (for Profile Editor)
+// ============================================================================
+
+// GET /api/profiles - List all available profiles
+app.get('/api/profiles', async (req, res) => {
+  try {
+    const profiles = await profileManager.listAvailableProfiles();
+    res.json({ profiles });
+  } catch (error) {
+    console.error('Failed to list profiles:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// GET /api/profiles/:name - Get specific profile content without loading
+app.get('/api/profiles/:name', async (req, res) => {
+  try {
+    const profileName = req.params.name;
+    const profile = await profileManager.getProfileContent(profileName);
+    res.json({ profile, profileName });
+  } catch (error) {
+    console.error(`Failed to get profile ${req.params.name}:`, error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// POST /api/profiles - Create new profile
+app.post('/api/profiles', authenticateToken, async (req, res) => {
+  try {
+    const { name, config } = req.body;
+
+    if (!name || !config) {
+      return res.status(400).json({ error: 'Name and config are required' });
+    }
+
+    const profile = await profileManager.createProfile(name, config);
+    res.json({ success: true, profile, profileName: name });
+  } catch (error) {
+    console.error('Failed to create profile:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// PUT /api/profiles/:name - Update existing profile
+app.put('/api/profiles/:name', authenticateToken, async (req, res) => {
+  try {
+    const profileName = req.params.name;
+    const { config } = req.body;
+
+    if (!config) {
+      return res.status(400).json({ error: 'Config is required' });
+    }
+
+    const profile = await profileManager.updateProfile(profileName, config);
+    res.json({ success: true, profile, profileName });
+  } catch (error) {
+    console.error(`Failed to update profile ${req.params.name}:`, error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// DELETE /api/profiles/:name - Delete profile
+app.delete('/api/profiles/:name', authenticateToken, async (req, res) => {
+  try {
+    const profileName = req.params.name;
+    await profileManager.deleteProfile(profileName);
+    res.json({ success: true, profileName });
+  } catch (error) {
+    console.error(`Failed to delete profile ${req.params.name}:`, error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// POST /api/profiles/:name/load - Hot reload/switch to profile
+app.post('/api/profiles/:name/load', authenticateToken, async (req, res) => {
+  try {
+    const profileName = req.params.name;
+    const profile = await profileManager.reloadProfile(profileName);
+
+    // Invalidate file cache to refresh with new profile metadata
+    invalidateCache();
+
+    // Broadcast profile reload event to all clients
+    io.emit('profile-reloaded', {
+      profileName,
+      profile,
+    });
+
+    res.json({
+      success: true,
+      profile,
+      profileName,
+      profilePath: profileManager.getProfilePath(),
+    });
+  } catch (error) {
+    console.error(`Failed to load profile ${req.params.name}:`, error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// POST /api/profiles/:name/prompts - Create/update prompt file
+app.post('/api/profiles/:name/prompts', authenticateToken, async (req, res) => {
+  try {
+    const profileName = req.params.name;
+    const { path: promptPath, content } = req.body;
+
+    if (!promptPath || content === undefined) {
+      return res.status(400).json({ error: 'Path and content are required' });
+    }
+
+    await profileManager.savePromptFile(profileName, promptPath, content);
+    res.json({ success: true, path: promptPath });
+  } catch (error) {
+    console.error('Failed to save prompt file:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// DELETE /api/profiles/:name/prompts - Delete prompt file
+app.delete('/api/profiles/:name/prompts', authenticateToken, async (req, res) => {
+  try {
+    const profileName = req.params.name;
+    const { path: promptPath } = req.body;
+
+    if (!promptPath) {
+      return res.status(400).json({ error: 'Path is required' });
+    }
+
+    await profileManager.deletePromptFile(profileName, promptPath);
+    res.json({ success: true, path: promptPath });
+  } catch (error) {
+    console.error('Failed to delete prompt file:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// GET /api/profiles/:name/prompts/:path(*) - Get prompt file content
+app.get('/api/profiles/:name/prompts/:path(*)', async (req, res) => {
+  try {
+    const profileName = req.params.name;
+    const promptPath = req.params.path;
+
+    const content = await profileManager.readPromptFile(profileName, promptPath);
+    res.json({ content, path: promptPath });
+  } catch (error) {
+    console.error('Failed to read prompt file:', error);
     res.status(500).json({ error: error.message });
   }
 });
@@ -996,6 +1352,18 @@ server.listen(PORT, async () => {
   console.log(`Server running on port ${PORT}`);
   console.log(`Markdown directory: ${MARKDOWN_DIR}`);
   console.log(`WebSocket server available at ws://localhost:${PORT}/ws`);
+
+  // Load profile if specified
+  const profileName = process.env.PROFILE_NAME;
+  if (profileName) {
+    try {
+      await profileManager.loadProfile(profileName);
+      console.log(`Profile "${profileName}" loaded successfully`);
+    } catch (err) {
+      console.error(`Failed to load profile "${profileName}":`, err.message);
+    }
+  }
+
   try {
     await setupWatcher();
     console.log('File watcher setup complete');

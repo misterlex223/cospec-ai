@@ -16,6 +16,7 @@ The CoSpec AI Markdown Editor is a containerized application that provides a Rea
 - **Routing**: React Router with **HashRouter** (for reverse proxy compatibility)
 - **Styling**: Tailwind CSS with shadcn/ui components
 - **Markdown Editor**: Vditor library
+- **WebSocket**: Socket.IO client for real-time communication with backend
 - **Location**: `/app-react/`
 - **Build Configuration**: Uses relative paths (`base: './'`) for reverse proxy support
 
@@ -35,6 +36,54 @@ The CoSpec AI Markdown Editor is a containerized application that provides a Rea
 
 ## Development Commands
 
+### Using pnpm (Recommended)
+
+**Prerequisites:**
+```bash
+# Install pnpm if not already installed
+npm install -g pnpm
+```
+
+**Development (runs both server and client simultaneously):**
+```bash
+# Install all dependencies (root + workspaces)
+pnpm install
+
+# Run both server and client in development mode
+pnpm run dev
+
+# This will start:
+# - Backend server on port 9280 (or PORT env var)
+# - Frontend dev server with hot reload on port 5173 (Vite default)
+# - WebSocket server on the same port as backend (9280)
+```
+
+**Development with Profile:**
+```bash
+# Start with a specific profile
+pnpm run dev --profile api-development
+
+# Or set environment variables first
+export PROFILE_NAME=api-development
+export MARKDOWN_DIR=/path/to/your/markdown
+pnpm run dev
+```
+
+**Individual Commands:**
+```bash
+# Run only server
+pnpm run dev:server
+
+# Run only client
+pnpm run dev:client
+
+# Build everything
+pnpm run build:all
+
+# Build only client
+pnpm run build:client
+```
+
 ### Docker-based Development
 ```bash
 # Standard production mode
@@ -47,7 +96,7 @@ docker compose -f docker-compose-dev.yml up --build
 MARKDOWN_DIR=/path/to/markdown docker compose up --build
 ```
 
-### Direct Development (without Docker)
+### Direct Development (without Docker, using npm)
 ```bash
 # Frontend
 cd app-react
@@ -62,18 +111,20 @@ npm run dev
 
 ### Build Commands
 ```bash
-# Frontend build
-cd app-react
-npm run build
+# Using pnpm (recommended)
+pnpm run build:all
 
-# Backend build (Node.js app, no separate build step needed)
+# Using npm
+npm run build:client
 
 # Docker build
 docker build -t cospec-ai-app .
 ```
 
 ### Environment Variables
-- `MARKDOWN_DIR`: Directory for storing Markdown files (default: `/markdown`)
+- `MARKDOWN_DIR`: Directory for storing Markdown files (default: `./markdown`)
+- `PROFILE_NAME`: Name of profile to load from `~/.cospec-ai/profiles/` (optional)
+- `PORT`: Server port (default: `9280`)
 - `NODE_ENV`: Environment mode (`production` or `development`)
 - `API_KEY`: Backend API authentication key (default: `demo-api-key`)
 - `KAI_PROJECT_ID`: Project ID for context sync integration (optional)
@@ -103,6 +154,13 @@ docker build -t cospec-ai-app .
 - `DELETE /api/files/:path/sync-to-context`: Unmark file from sync (requires auth)
 - `GET /api/files/:path/sync-status`: Get sync status for a file
 - `GET /api/context-config`: Get context sync configuration and health status
+
+**Profile Management:**
+- `GET /api/profile`: Get loaded profile configuration
+- `GET /api/profile/files`: Get required files with existence status
+- `GET /api/profile/prompt/:path`: Get prompt file content for preview
+- `POST /api/profile/generate/:path`: Execute generation command for file (requires auth)
+- `GET /api/profile/validate`: Validate profile configuration
 
 ### File Structure
 - `/app-react/` - React frontend application
@@ -318,3 +376,314 @@ The chokidar file watcher monitors markdown files and triggers sync operations:
 3. **Idempotency**: Multiple syncs of same file content result in update, not duplicate
 4. **Debouncing**: File changes are debounced to avoid excessive API calls during editing
 5. **Graceful Degradation**: If Kai backend is unavailable, sync fails gracefully without breaking editor
+
+## Document Profile Feature
+
+The Document Profile feature allows users to define required documents and folders with AI generation capabilities. Profiles help standardize project structure and automate document generation using external commands or AI agents.
+
+### Profile Storage
+
+Profiles are stored in `~/.cospec-ai/profiles/<profile-name>/`:
+```
+~/.cospec-ai/profiles/
+└── api-development/
+    ├── profile.json          # Main profile configuration
+    └── prompts/              # Agent prompt files
+        ├── api-spec.md
+        ├── requirements.md
+        └── architecture.md
+```
+
+### CLI Usage
+
+**Start CoSpec AI with a profile:**
+```bash
+npx cospec-ai --profile api-development
+```
+
+**Create a new profile:**
+```bash
+npx cospec-ai init-profile my-project
+```
+
+This creates a profile skeleton at `~/.cospec-ai/profiles/my-project/` with:
+- `profile.json` - Example profile configuration
+- `prompts/example.md` - Example prompt file
+
+**Launch Profile Editor:**
+```bash
+npx cospec-ai --profile-editor
+```
+
+This starts CoSpec AI in Profile Editor mode, a visual interface for creating and managing profiles. See [PROFILE_EDITOR.md](docs/PROFILE_EDITOR.md) for detailed documentation.
+
+### Profile Configuration
+
+**Profile JSON Structure:**
+```json
+{
+  "name": "API Development Profile",
+  "version": "1.0.0",
+  "description": "Profile for REST API development projects",
+  "documents": [
+    {
+      "name": "API Specification",
+      "path": "SPEC.md",
+      "description": "Main API specification document",
+      "promptFile": "prompts/api-spec.md",
+      "promptText": "Generate comprehensive API spec",
+      "command": "kai agent execute --prompt-file {promptFile} --output {filePath}"
+    }
+  ],
+  "folders": [
+    {
+      "name": "Requirements",
+      "path": "requirements/",
+      "description": "Requirements documentation folder",
+      "documentType": "requirement",
+      "documents": [...]
+    }
+  ]
+}
+```
+
+**Field Descriptions:**
+- `name`: Display name of the profile
+- `version`: Profile version (semver)
+- `description`: Brief description of the profile's purpose
+- `documents`: Array of required top-level documents
+- `folders`: Array of folders with their required documents
+
+**Document Configuration:**
+- `name`: Document display name
+- `path`: Path relative to markdown directory (e.g., "SPEC.md" or "requirements/api.md")
+- `description`: Purpose of the document
+- `promptFile`: Path to prompt file relative to profile directory (e.g., "prompts/api-spec.md")
+- `promptText`: Additional prompt text for generation
+- `command`: Shell command to execute for generation
+
+**Command Variable Substitution:**
+- `{promptFile}`: Absolute path to the prompt file
+- `{filePath}`: Absolute path to the target file in markdown directory
+- `{promptText}`: The promptText value from profile.json
+
+Example:
+```bash
+kai agent execute --prompt-file {promptFile} --output {filePath} --context "{promptText}"
+```
+
+### Frontend Integration
+
+**File Tree Enhancements:**
+- Missing required files show with:
+  - Red warning icon (⚠️)
+  - Grayed out text
+  - "Missing" badge
+  - Tooltip with document name and description
+- Existing required files show:
+  - "Required" badge (blue)
+  - Tooltip with profile information
+- Ghost entries: Missing files appear in tree at their expected location
+
+**Context Menu:**
+- Right-click on missing required file: "⚡ Generate from Profile"
+- Right-click on existing required file: "⚡ Regenerate"
+- Only shown if document has a generation command
+
+**Generation Flow:**
+1. User right-clicks file and selects "Generate from Profile"
+2. Frontend dispatches `generateFile()` action
+3. Backend executes the command with variable substitution
+4. Real-time output streamed via WebSocket
+5. On success: File tree refreshes, file auto-opens in editor
+6. On failure: Error notification shown
+
+### Backend Implementation
+
+**Server Components:**
+- `server/profileManager.js`: Profile loading, validation, path resolution
+- Profile loaded on server startup if `PROFILE_NAME` environment variable set
+- Validates profile schema and checks prompt file existence
+- Provides methods for document lookup and generation context
+
+**API Endpoints:**
+- `GET /api/profile`: Get loaded profile configuration
+- `GET /api/profile/files`: Get required files with existence status
+- `GET /api/profile/prompt/:path`: Get prompt file content for preview
+- `POST /api/profile/generate/:path`: Execute generation command (requires auth)
+- `GET /api/profile/validate`: Validate profile configuration
+
+**Profile Management API (for Profile Editor):**
+- `GET /api/profiles`: List all available profiles
+- `GET /api/profiles/:name`: Get specific profile content
+- `POST /api/profiles`: Create new profile (requires auth)
+- `PUT /api/profiles/:name`: Update profile (requires auth)
+- `DELETE /api/profiles/:name`: Delete profile (requires auth)
+- `POST /api/profiles/:name/load`: Hot reload profile (requires auth)
+- `POST /api/profiles/:name/prompts`: Create/update prompt file (requires auth)
+- `DELETE /api/profiles/:name/prompts`: Delete prompt file (requires auth)
+- `GET /api/profiles/:name/prompts/:path(*)`: Get prompt file content
+- `GET /api/config`: Get app configuration (editor mode status)
+
+**ProfileManager CRUD Methods:**
+- `createProfile(name, config)`: Create new profile with validation
+- `updateProfile(name, config)`: Update existing profile (creates backup)
+- `deleteProfile(name)`: Delete profile directory
+- `reloadProfile(name)`: Hot reload profile without server restart
+- `savePromptFile(profileName, path, content)`: Save/update prompt file
+- `deletePromptFile(profileName, path)`: Delete prompt file
+- `readPromptFile(profileName, path)`: Read prompt file content
+
+**Generation Process:**
+1. Validate document exists in profile and has command
+2. Resolve prompt file to absolute path
+3. Build command with variable substitution
+4. Execute via `child_process.spawn()`
+5. Stream stdout/stderr to clients via WebSocket
+6. On success: Invalidate file cache, broadcast file-added event
+7. On failure: Emit error event
+
+**WebSocket Events:**
+- `generation-output`: Real-time command output `{ path, output, isError }`
+- `generation-complete`: Generation finished `{ path, success, exitCode, output }`
+- `profile-reloaded`: Profile hot reload event `{ profileName, profile }`
+
+### Frontend State Management
+
+**Redux Profile Slice (`profileSlice.ts`):**
+- Stores profile configuration, required files
+- Manages generation state per file (isGenerating, output, success, error)
+- Handles WebSocket events for real-time updates
+- Caches prompt file content
+
+**Actions:**
+- `fetchProfile()`: Load profile from server
+- `fetchPromptContent(filePath)`: Get prompt file content
+- `generateFile(filePath)`: Trigger file generation
+- `addGenerationOutput()`: Handle WebSocket output events
+- `setGenerationComplete()`: Handle generation completion
+
+**Redux Profile Editor Slice (`profileEditorSlice.ts`):**
+- Manages profile editing state (available profiles, editing profile, validation)
+- Handles profile CRUD operations
+- Manages prompt file editing
+- Tracks active profile and hot reload state
+
+**Profile Editor Components:**
+- `ProfileEditorApp.tsx`: Main app wrapper for editor mode
+- `ProfileBrowser.tsx`: Profile list with create/edit/delete/activate actions
+- `ProfileEditorPage.tsx`: Profile configuration editor
+- `DocumentList.tsx`: Document management with drag-drop support
+- `FolderList.tsx`: Folder and nested document management
+- `PromptFileManager.tsx`: Simple textarea for quick prompt editing
+
+**Mode Detection:**
+- `main.tsx` checks `/api/config` on startup
+- Renders `ProfileEditorApp` if `profileEditorMode === true`
+- Renders regular `App` for markdown editing mode
+- No code changes needed for proxy deployment
+
+### Example Profiles
+
+CoSpec AI includes example profiles in `/profiles/`:
+
+**api-development**: REST API project template
+- Required documents: SPEC.md, README.md
+- Folders: requirements/, docs/
+- Prompts for API specs, functional/non-functional requirements, architecture
+
+**Usage:**
+1. Copy example profile to `~/.cospec-ai/profiles/`:
+   ```bash
+   cp -r profiles/api-development ~/.cospec-ai/profiles/
+   ```
+2. Customize profile.json and prompts as needed
+3. Start CoSpec AI with the profile:
+   ```bash
+   npx cospec-ai --profile api-development
+   ```
+
+### Profile Development Workflow
+
+1. **Create Profile Skeleton:**
+   ```bash
+   npx cospec-ai init-profile my-project
+   cd ~/.cospec-ai/profiles/my-project
+   ```
+
+2. **Edit profile.json:**
+   - Add required documents and folders
+   - Specify file paths and descriptions
+   - Define generation commands
+
+3. **Create Prompt Files:**
+   - Add prompt files in `prompts/` directory
+   - Write clear instructions for AI agents
+   - Include examples and structure guidelines
+
+4. **Test Profile:**
+   ```bash
+   npx cospec-ai --profile my-project
+   ```
+   - Right-click missing files in tree
+   - Select "Generate from Profile"
+   - Verify generated content
+
+5. **Iterate:**
+   - Refine prompts based on output quality
+   - Adjust commands if needed
+   - Add more documents as requirements grow
+
+### Integration with Kai Agents
+
+CoSpec AI is designed to work with Kai's agent system for document generation:
+
+**Example Command:**
+```bash
+kai agent execute --prompt-file {promptFile} --output {filePath}
+```
+
+**Prompt File Format:**
+Markdown files containing:
+- Clear instructions for the AI
+- Structure guidelines
+- Examples
+- Required sections
+
+**Workflow:**
+1. User triggers generation from UI
+2. CoSpec AI executes Kai agent command
+3. Kai agent reads prompt file
+4. Kai agent generates content
+5. Output written to target file
+6. CoSpec AI detects new file and refreshes tree
+
+### Best Practices
+
+1. **Profile Organization:**
+   - One profile per project type
+   - Group related documents in folders
+   - Use clear, descriptive names
+
+2. **Prompt Files:**
+   - Be specific about requirements
+   - Include structure templates
+   - Provide examples
+   - Specify format (Markdown, JSON, etc.)
+
+3. **Generation Commands:**
+   - Use absolute paths via variables
+   - Handle errors gracefully
+   - Log output for debugging
+   - Test commands manually first
+
+4. **Profile Versioning:**
+   - Use semantic versioning
+   - Document breaking changes
+   - Keep prompts updated with profile
+
+5. **Security:**
+   - Validate profile JSON schema
+   - Sanitize file paths
+   - Require authentication for generation
+   - Limit command execution scope

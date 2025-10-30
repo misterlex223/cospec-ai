@@ -2,7 +2,7 @@
 
 const path = require('path');
 
-const MARKDOWN_DIR = process.env.MARKDOWN_DIR || '/markdown';
+const MARKDOWN_DIR = process.env.MARKDOWN_DIR || path.join(__dirname, '..', 'markdown');
 
 // Enhanced path validation and security function
 function validateAndSanitizePath(inputPath, allowRelative = false) {

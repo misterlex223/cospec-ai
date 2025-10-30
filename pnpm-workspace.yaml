@@ -1,0 +1,6 @@
+packages:
+  - app-react
+  - server
+
+onlyBuiltDependencies:
+  - esbuild

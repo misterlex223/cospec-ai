@@ -4,7 +4,7 @@ const fs = require('fs').promises;
 const path = require('path');
 const { glob } = require('glob');
 
-const MARKDOWN_DIR = process.env.MARKDOWN_DIR || '/markdown';
+const MARKDOWN_DIR = process.env.MARKDOWN_DIR || path.join(__dirname, '..', 'markdown');
 
 const parameters = {
   type: 'object',

@@ -4,6 +4,8 @@ import uiReducer from './slices/uiSlice';
 import editorReducer from './slices/editorSlice';
 import notificationsReducer from './slices/notificationsSlice';
 import contextReducer from './slices/contextSlice';
+import profileReducer from './slices/profileSlice';
+import profileEditorReducer from './slices/profileEditorSlice';
 
 export const store = configureStore({
   reducer: {
@@ -12,6 +14,8 @@ export const store = configureStore({
     editor: editorReducer,
     notifications: notificationsReducer,
     context: contextReducer,
+    profile: profileReducer,
+    profileEditor: profileEditorReducer,
   },
   middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware({
