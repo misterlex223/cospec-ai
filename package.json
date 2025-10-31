@@ -1,6 +1,6 @@
 {
   "name": "cospec-ai",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "CoSpec AI - Integrated Markdown Editor with AI capabilities",
   "main": "server/index.js",
   "bin": {
@@ -81,13 +81,18 @@
   },
   "files": [
     "bin/",
-    "server/",
+    "server/**/*.js",
+    "server/package.json",
+    "server/pnpm-lock.yaml",
+    "!server/node_modules",
     "dist/",
-    "build-frontend.js"
+    "build-frontend.js",
+    "README.md",
+    "LICENSE"
   ],
   "repository": {
     "type": "git",
-    "url": "https://github.com/misterlex223/cospec-ai.git"
+    "url": "git+https://github.com/misterlex223/cospec-ai.git"
   },
   "bugs": {
     "url": "https://github.com/misterlex223/cospec-ai/issues"

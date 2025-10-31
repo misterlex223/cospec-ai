@@ -3,17 +3,22 @@ const path = require('path');
 const fs = require('fs');
 
 // Run the build command from the app-react directory
-console.log('Installing frontend dependencies...');
 const sourceDir = path.join(__dirname, 'app-react');
+const nodeModulesDir = path.join(sourceDir, 'node_modules');
 
 try {
-  // Install dependencies first
-  execSync('npm install', { 
-    cwd: sourceDir,
-    stdio: 'inherit',
-    env: process.env
-  });
-  
+  // Only install dependencies if node_modules doesn't exist
+  if (!fs.existsSync(nodeModulesDir)) {
+    console.log('Installing frontend dependencies...');
+    execSync('npm install --ignore-scripts', {
+      cwd: sourceDir,
+      stdio: 'inherit',
+      env: process.env
+    });
+  } else {
+    console.log('Frontend dependencies already installed, skipping...');
+  }
+
   console.log('Building frontend...');
   // Then run the build
   const buildResult = execSync('npm run build', { 
