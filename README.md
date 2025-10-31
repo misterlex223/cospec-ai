@@ -25,12 +25,19 @@ The application will be available at http://localhost:9280
 ### Command Line Options
 
 ```bash
-npx cospec-ai [options]
+npx cospec-ai [options] [command]
 ```
 
+**Options:**
 - `--port, -p`: Port to run the server on (default: 9280)
 - `--markdown-dir, -m`: Directory to store markdown files (default: ./markdown)
+- `--profile, -P`: Profile name to load from ~/.cospec-ai/profiles/
+- `--profile-editor`: Launch in profile editor mode
 - `--help`: Show help information
+
+**Commands:**
+- `list-profiles`: List all available profiles
+- `init-profile <name>`: Initialize a new profile
 
 ### Examples
 
@@ -46,6 +53,18 @@ npx cospec-ai --markdown-dir /path/to/my/markdown/files
 
 # Use both options
 npx cospec-ai --port 8080 --markdown-dir ./my-docs
+
+# Start with a specific profile
+npx cospec-ai --profile api-development
+
+# List all available profiles
+npx cospec-ai list-profiles
+
+# Create a new profile
+npx cospec-ai init-profile my-project
+
+# Launch profile editor
+npx cospec-ai --profile-editor
 ```
 
 ## Configuration
@@ -73,6 +92,44 @@ When running via npx, you can set environment variables:
 - `POST /api/files/refresh` - Refresh file cache
 - `POST /api/ai/chat` - AI chat functionality
 - `POST /api/ai/functions` - AI functions (summarize, rewrite, etc.)
+
+## Document Profiles
+
+CoSpec AI supports document profiles to standardize project structure and automate document generation. Profiles define required documents and folders with AI generation capabilities.
+
+### Profile Management
+
+**List available profiles:**
+```bash
+npx cospec-ai list-profiles
+```
+
+**Create a new profile:**
+```bash
+npx cospec-ai init-profile my-project
+```
+
+This creates a profile skeleton at `~/.cospec-ai/profiles/my-project/` with example configuration.
+
+**Use a profile:**
+```bash
+npx cospec-ai --profile my-project
+```
+
+**Edit profiles visually:**
+```bash
+npx cospec-ai --profile-editor
+```
+
+### Profile Features
+
+- **Required Documents**: Define must-have documents for your project type
+- **Folder Structure**: Organize documents into logical folders
+- **AI Generation**: Generate documents using AI agents with custom prompts
+- **Visual Indicators**: Missing files shown with warnings in file tree
+- **One-Click Generation**: Right-click missing files to generate from profile
+
+For detailed profile documentation, see [CLAUDE.md](CLAUDE.md#document-profile-feature).
 
 ## Context System Integration
 

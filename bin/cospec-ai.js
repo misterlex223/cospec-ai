@@ -6,6 +6,64 @@ const os = require('os');
 const yargs = require('yargs/yargs');
 const { hideBin } = require('yargs/helpers');
 
+// Command handler for list-profiles
+async function listProfiles() {
+  const baseProfileDir = path.join(os.homedir(), '.cospec-ai', 'profiles');
+
+  try {
+    // Ensure base directory exists
+    await fs.mkdir(baseProfileDir, { recursive: true });
+
+    const entries = await fs.readdir(baseProfileDir, { withFileTypes: true });
+    const profiles = [];
+
+    for (const entry of entries) {
+      if (entry.isDirectory()) {
+        // Check if profile.json exists
+        const profileJsonPath = path.join(baseProfileDir, entry.name, 'profile.json');
+        try {
+          await fs.access(profileJsonPath);
+
+          // Read profile details
+          const profileContent = await fs.readFile(profileJsonPath, 'utf-8');
+          const profileData = JSON.parse(profileContent);
+
+          profiles.push({
+            name: entry.name,
+            displayName: profileData.name || entry.name,
+            version: profileData.version || 'N/A',
+            description: profileData.description || 'No description',
+            path: path.join(baseProfileDir, entry.name)
+          });
+        } catch (err) {
+          // Skip directories without valid profile.json
+        }
+      }
+    }
+
+    if (profiles.length === 0) {
+      console.log('No profiles found.');
+      console.log(`\nCreate a new profile with: npx cospec-ai init-profile <name>`);
+    } else {
+      console.log(`Found ${profiles.length} profile(s):\n`);
+
+      profiles.forEach((profile, index) => {
+        console.log(`${index + 1}. ${profile.name}`);
+        console.log(`   Name: ${profile.displayName}`);
+        console.log(`   Version: ${profile.version}`);
+        console.log(`   Description: ${profile.description}`);
+        console.log(`   Path: ${profile.path}`);
+        console.log('');
+      });
+
+      console.log(`\nUse a profile with: npx cospec-ai --profile <name>`);
+    }
+  } catch (err) {
+    console.error(`Failed to list profiles: ${err.message}`);
+    process.exit(1);
+  }
+}
+
 // Command handler for init-profile
 async function initProfile(profileName) {
   const baseProfileDir = path.join(os.homedir(), '.cospec-ai', 'profiles');
@@ -82,8 +140,21 @@ Replace this content with your actual generation instructions for AI agents.
   }
 }
 
+// Track if a command was executed
+let commandExecuted = false;
+
 const argv = yargs(hideBin(process.argv))
   .usage('Usage: $0 [options]')
+  .command(
+    'list-profiles',
+    'List all available profiles',
+    () => {},
+    async () => {
+      commandExecuted = true;
+      await listProfiles();
+      process.exit(0);
+    }
+  )
   .command(
     'init-profile <name>',
     'Initialize a new profile',
@@ -94,6 +165,7 @@ const argv = yargs(hideBin(process.argv))
       });
     },
     async (argv) => {
+      commandExecuted = true;
       await initProfile(argv.name);
       process.exit(0);
     }
@@ -130,13 +202,12 @@ const argv = yargs(hideBin(process.argv))
   .argv;
 
 // Set environment variables based on command line options
-process.env.PORT = argv.port;
+process.env.PORT = String(argv.port);
 process.env.MARKDOWN_DIR = argv.markdownDir;
 process.env.PROFILE_NAME = argv.profile || '';
 process.env.PROFILE_EDITOR_MODE = argv.profileEditor ? 'true' : 'false';
 
-// Start the main server (only if not running a command)
-// Check if argv._ exists and doesn't include init-profile
-if (!argv._ || !argv._.includes('init-profile')) {
+// Start the main server only if no command was executed
+if (!commandExecuted) {
   require('../server/index.js');
 }

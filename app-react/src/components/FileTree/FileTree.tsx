@@ -1,3 +1,19 @@
+/**
+ * FileTree Component - Pure CSS Version
+ *
+ * This is an example implementation using pure CSS classes from FileTree.css
+ * instead of Tailwind utility classes. This approach provides:
+ * - Better CSS isolation
+ * - Easier maintenance
+ * - Better performance (no runtime class computation)
+ * - Cleaner JSX markup
+ *
+ * To use this version:
+ * 1. Backup current FileTree.tsx
+ * 2. Rename this file to FileTree.tsx
+ * 3. Test thoroughly
+ */
+
 import React, { useEffect, memo, useCallback, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useSelector, useDispatch } from 'react-redux';
@@ -12,6 +28,7 @@ import { Button } from '../ui/button';
 import { webSocketService, connectWebSocket } from '../../services/websocket';
 import type { RootState } from '../../store';
 import type { AppDispatch } from '../../store';
+import './FileTree.css';
 
 interface TreeNode {
   name: string;
@@ -32,297 +49,13 @@ interface FileTreeProps {
   className?: string;
 }
 
-/**
- * 文件樹組件
- * @see /docs/solved_issues.md#21-文件樹展開狀態保持
- * @see /docs/solved_issues.md#22-文件樹展開閃爍問題
- * @see /docs/requirements.md#31-側邊欄目錄樹
- */
-function FileTreeComponent({ className }: FileTreeProps) {
-  const dispatch = useDispatch();
-  const files = useSelector((state: RootState) => state.files.fileList);
-  const loading = useSelector((state: RootState) => state.files.loading);
-  const error = useSelector((state: RootState) => state.files.error);
-  const refreshCounter = useSelector((state: RootState) => state.files.refreshCounter);
-  const expandedPathsSet = useSelector((state: RootState) => new Set(state.ui.expandedPaths));
-  const [treeData, setTreeData] = React.useState<TreeNode[]>([]);
-  const navigate = useNavigate();
-  /**
-   * 從 URL 中獲取當前文件路徑
-   * @see /docs/solved_issues.md#21-文件樹展開狀態保持
-   */
-  // 從 URL 獲取目前路徑，不需要 decodeURIComponent
-  const currentPath = window.location.pathname.startsWith('/edit/') 
-    ? window.location.pathname.substring(6) 
-    : null;
-
-  // 添加一個狀態追蹤上次更新的時間
-  const [lastUpdateTime, setLastUpdateTime] = useState(0);
-  
-  // 將抓取文件列表的邏輯提取為一個函數
-  const fetchFiles = useCallback(async (showLoading = false) => {
-    try {
-      if (showLoading) {
-        dispatch(setLoading(true));
-      }
-      
-      const fileList = await fileApi.getAllFiles();
-      
-      // 比較文件列表是否有變化，只有變化時才更新
-      const hasChanged = JSON.stringify(fileList) !== JSON.stringify(files);
-      if (hasChanged) {
-        dispatch(setFileList(fileList));
-        setLastUpdateTime(Date.now());
-      }
-      
-      dispatch(setLoading(false));
-    } catch (err) {
-      dispatch(addNotification({
-        type: 'error',
-        message: 'Failed to fetch files',
-        title: 'Load Error'
-      }));
-      dispatch(setLoading(false));
-      console.error('Error fetching files:', err);
-    }
-  }, [dispatch, files]);
-
-  // 手動刷新文件列表
-  const refreshFiles = useCallback(async () => {
-    try {
-      dispatch(setLoading(true));
-      // 使用新增的緩存刷新端點
-      await fileApi.refreshFileCache();
-      await fetchFiles(false);
-    } catch (err) {
-      console.error('Error refreshing files:', err);
-      dispatch(addNotification({
-        type: 'error',
-        message: 'Failed to refresh files',
-        title: 'Refresh Error'
-      }));
-      dispatch(setLoading(false));
-    }
-  }, [dispatch, fetchFiles]);
-
-  // 初始加載和刷新計數器變化時加載文件
-  useEffect(() => {
-    fetchFiles(files.length === 0);
-  }, [refreshCounter, fetchFiles, files.length]);
-
-  // 使用 WebSocket 進行即時更新
-  useEffect(() => {
-    // 連接 WebSocket
-    connectWebSocket();
-    
-    // 監聽文件更新事件
-    const handleFileAdded = (data: any) => {
-      console.log('File added via WebSocket:', data);
-      fetchFiles(false);
-    };
-    
-    const handleFileChanged = (data: any) => {
-      console.log('File changed via WebSocket:', data);
-      // 文件內容變更不需要重新加載文件列表
-    };
-    
-    const handleFileDeleted = (data: any) => {
-      console.log('File deleted via WebSocket:', data);
-      fetchFiles(false);
-    };
-    
-    // 註冊事件監聽器
-    webSocketService.addEventListener('FILE_ADDED', handleFileAdded);
-    webSocketService.addEventListener('FILE_CHANGED', handleFileChanged);
-    webSocketService.addEventListener('FILE_DELETED', handleFileDeleted);
-    
-    // 監聽連接狀態
-    const handleConnection = (data: any) => {
-      if (data.status === 'connected') {
-        console.log('WebSocket connected, fetching files...');
-        fetchFiles(false);
-      }
-    };
-    
-    webSocketService.addEventListener('connection', handleConnection);
-    
-    // 作為備用，仍然保留一個輪詢機制，但間隔更長
-    const pollInterval = 60000; // 60 秒
-    
-    const interval = setInterval(() => {
-      // 如果 WebSocket 連接正常，則不需要輪詢
-      if (webSocketService.isConnected()) {
-        return;
-      }
-      
-      // 檢查距離上次更新的時間
-      const now = Date.now();
-      const timeSinceLastUpdate = now - lastUpdateTime;
-      
-      // 如果距離上次更新不足 5 秒，則跳過此次輪詢
-      if (lastUpdateTime > 0 && timeSinceLastUpdate < 5000) {
-        console.log('Skipping poll, last update was too recent');
-        return;
-      }
-      
-      console.log('WebSocket not connected, using polling as fallback');
-      fetchFiles(false);
-    }, pollInterval);
-    
-    // 清理函數
-    return () => {
-      clearInterval(interval);
-      webSocketService.removeEventListener('FILE_ADDED', handleFileAdded);
-      webSocketService.removeEventListener('FILE_CHANGED', handleFileChanged);
-      webSocketService.removeEventListener('FILE_DELETED', handleFileDeleted);
-      webSocketService.removeEventListener('connection', handleConnection);
-    };
-  }, [fetchFiles, lastUpdateTime]);
-
-  /**
-   * 當前文件路徑變化時，自動展開包含該文件的所有目錄
-   * @see /docs/solved_issues.md#21-文件樹展開狀態保持
-   * @see /docs/requirements.md#316-自動展開包含當前文件的目錄
-   */
-  useEffect(() => {
-    if (currentPath) {
-      // 判斷是否為目錄路徑
-      const isDirectory = currentPath.endsWith('/') || !currentPath.includes('.');
-      
-      // 如果是目錄路徑，展開自身；如果是文件路徑，展開父目錄
-      const pathToExpand = isDirectory ? currentPath : currentPath.substring(0, currentPath.lastIndexOf('/'));
-      const pathParts = pathToExpand.split('/');
-      let currentDirPath = '';
-      
-      // 展開所有父目錄
-      for (let i = 0; i < pathParts.length; i++) {
-        if (pathParts[i]) { // 確保不是空字串
-          currentDirPath = currentDirPath 
-            ? `${currentDirPath}/${pathParts[i]}` 
-            : pathParts[i];
-          dispatch(expandPath(currentDirPath));
-        }
-      }
-    }
-  }, [currentPath, dispatch]);
-
-  useEffect(() => {
-    // 構建樹狀結構
-    const buildTree = (files: FileInfo[]) => {
-      const root: TreeNode[] = [];
-      const directoryMap: Record<string, TreeNode> = {};
-
-      // 驗證 files 是有效的陣列
-      if (!files || !Array.isArray(files)) {
-        console.warn('Files is not an array:', files);
-        return root;
-      }
-
-      // 先創建所有目錄
-      files.forEach(file => {
-        const pathParts = file.path.split('/');
-        let currentPath = '';
-        for (let i = 0; i < pathParts.length - 1; i++) {
-          const part = pathParts[i];
-          const parentPath = currentPath;
-          currentPath = currentPath ? `${currentPath}/${part}` : part;
-
-          if (!directoryMap[currentPath]) {
-            const newDir: TreeNode = {
-              name: part,
-              children: [],
-              type: 'directory',
-              path: currentPath,
-            };
-            directoryMap[currentPath] = newDir;
-
-            if (parentPath) {
-              directoryMap[parentPath].children = directoryMap[parentPath].children || [];
-              directoryMap[parentPath].children?.push(newDir);
-            } else {
-              root.push(newDir);
-            }
-          }
-        }
-      });
-
-      // 將文件放入對應的目錄
-      files.forEach(file => {
-        const pathParts = file.path.split('/');
-        const fileName = pathParts[pathParts.length - 1];
-        const parentPath = pathParts.slice(0, -1).join('/');
-
-        const fileNode: TreeNode = {
-          name: fileName,
-          type: 'file',
-          path: file.path,
-          exists: file.exists !== undefined ? file.exists : true,
-          profileMetadata: file.profileMetadata,
-        };
-
-        if (parentPath && directoryMap[parentPath]) {
-          directoryMap[parentPath].children = directoryMap[parentPath].children || [];
-          directoryMap[parentPath].children?.push(fileNode);
-        } else {
-          root.push(fileNode);
-        }
-      });
-
-      // 排序，讓目錄顯示在文件前面
-      const sortNodes = (nodes: TreeNode[]) => {
-        nodes.sort((a, b) => {
-          if (a.type === 'directory' && b.type === 'file') return -1;
-          if (a.type === 'file' && b.type === 'directory') return 1;
-          return a.name.localeCompare(b.name);
-        });
-        nodes.forEach(node => {
-          if (node.type === 'directory' && node.children) {
-            sortNodes(node.children);
-          }
-        });
-      };
-
-      sortNodes(root);
-      return root;
-    };
-
-    setTreeData(buildTree(files));
-  }, [files]);
-
-  // 移除不需要的代碼
-
-  const handleFileClick = (path: string) => {
-    // 使用未編碼的路徑
-    navigate(`/edit/${path}`);
-  };
-  
-  // 處理目錄點擊
-  const handleDirectoryClick = (path: string) => {
-    // 確保目錄路徑以 / 結尾
-    const dirPath = path.endsWith('/') ? path : `${path}/`;
-    navigate(`/edit/${dirPath}`);
-  };
-
-  /**
-   * 處理目錄展開/折疊
-   * @see /docs/solved_issues.md#22-文件樹展開閃爍問題
-   * @see /docs/requirements.md#312-文件夾展開折疊功能
-   * @see /docs/requirements.md#315-展開狀態持久化
-   */
-  const handleDirectoryToggle = (path: string) => {
-    dispatch(togglePathExpanded(path));
-  };
-
-/**
- * 檔案節點組件 - 使用 memo 避免不必要的重新渲染
- */
 interface FileNodeProps {
   node: TreeNode;
   currentPath: string | null;
   expandedPaths: Set<string>;
   onFileClick: (path: string) => void;
   onDirectoryToggle: (path: string) => void;
-  onDirectoryClick?: (path: string) => void; // 添加目錄點擊處理函數
+  onDirectoryClick?: (path: string) => void;
 }
 
 const FileNode = memo(({ node, currentPath, expandedPaths, onFileClick, onDirectoryToggle, onDirectoryClick }: FileNodeProps) => {
@@ -388,7 +121,6 @@ const FileNode = memo(({ node, currentPath, expandedPaths, onFileClick, onDirect
         message: `Started generation for ${node.name}`,
         title: 'Generation Started'
       }));
-      // Refresh file list after a delay to allow generation to complete
       setTimeout(() => {
         dispatch(refreshFileList());
       }, 2000);
@@ -421,33 +153,47 @@ const FileNode = memo(({ node, currentPath, expandedPaths, onFileClick, onDirect
     }
   };
 
+  const getSyncStatusClass = () => {
+    if (!syncStatus) return '';
+    switch (syncStatus.status) {
+      case 'synced': return 'synced';
+      case 'syncing': return 'syncing';
+      case 'error': return 'error';
+      case 'auto-eligible': return 'auto-eligible';
+      default: return '';
+    }
+  };
+
   if (node.type === 'directory') {
+    const isExpanded = expandedPaths.has(node.path);
     return (
       <div className="group">
-        <div
-          className="flex items-center cursor-pointer p-1 hover:bg-gray-100 dark:hover:bg-gray-800 rounded"
-        >
+        <div className="file-tree-directory">
           <span
-            className="mr-2 cursor-pointer"
+            className={cn('file-tree-chevron', isExpanded && 'expanded')}
             onClick={() => onDirectoryToggle(node.path)}
           >
-            {expandedPaths.has(node.path) ? '📂' : '📁'}
+            ▶
+          </span>
+          <span className="file-tree-folder-icon">
+            📁
           </span>
           <span
-            className="flex-1 cursor-pointer"
+            className="file-tree-directory-name"
             onClick={() => onDirectoryClick ? onDirectoryClick(node.path) : onDirectoryToggle(node.path)}
           >
             {node.name}
           </span>
         </div>
-        {expandedPaths.has(node.path) && node.children && (
-          <div className="ml-2">
+        {isExpanded && node.children && (
+          <div className="file-tree-children">
             <TreeList
               nodes={node.children}
               currentPath={currentPath}
               expandedPaths={expandedPaths}
               onFileClick={onFileClick}
               onDirectoryToggle={onDirectoryToggle}
+              onDirectoryClick={onDirectoryClick}
             />
           </div>
         )}
@@ -456,82 +202,81 @@ const FileNode = memo(({ node, currentPath, expandedPaths, onFileClick, onDirect
   } else {
     const isMissing = node.exists === false;
     const isRequired = node.profileMetadata?.required;
+    const isSelected = currentPath === node.path;
 
     return (
       <>
         <div
           className={cn(
-            'flex items-center cursor-pointer p-1 rounded',
-            isMissing ? 'opacity-60' : '',
-            currentPath === node.path ? 'bg-blue-100 dark:bg-blue-900' : 'hover:bg-gray-100 dark:hover:bg-gray-800'
+            'file-tree-file',
+            isMissing && 'missing',
+            isSelected && 'selected'
           )}
           onClick={() => !isMissing && onFileClick(node.path)}
           onContextMenu={handleContextMenu}
           title={isRequired ? `Required by profile: ${node.profileMetadata?.documentName}\n${node.profileMetadata?.description}` : undefined}
         >
-          <span className="mr-2">
+          <span className={cn('file-tree-file-icon', isMissing ? 'missing' : 'normal')}>
             {isMissing ? '⚠️' : '📄'}
           </span>
           <span className={cn(
-            currentPath === node.path ? 'font-semibold' : '',
-            isMissing ? 'text-gray-500 dark:text-gray-400' : ''
+            'file-tree-file-name',
+            isSelected && 'selected',
+            isMissing && 'missing'
           )}>
             {node.name}
           </span>
-          {isMissing && (
-            <span className="ml-2 text-xs px-1 py-0.5 bg-red-100 dark:bg-red-900 text-red-700 dark:text-red-300 rounded">
-              Missing
-            </span>
-          )}
-          {isRequired && !isMissing && (
-            <span className="ml-2 text-xs px-1 py-0.5 bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 rounded">
-              Required
-            </span>
-          )}
-          {getSyncIcon() && (
-            <span className={`ml-2 text-xs ${
-              syncStatus?.status === 'synced' ? 'text-green-600' :
-              syncStatus?.status === 'syncing' ? 'text-yellow-600' :
-              syncStatus?.status === 'error' ? 'text-red-600' :
-              'text-blue-600'
-            }`}>
-              {getSyncIcon()}
-            </span>
-          )}
-          {currentPath === node.path && <span className="ml-2 text-xs text-blue-600 dark:text-blue-400">• 當前</span>}
+          <div className="file-tree-badges">
+            {isMissing && (
+              <span className="file-tree-badge missing">
+                Missing
+              </span>
+            )}
+            {isRequired && !isMissing && (
+              <span className="file-tree-badge required">
+                Required
+              </span>
+            )}
+            {getSyncIcon() && (
+              <span className={cn('file-tree-sync-icon', getSyncStatusClass())}>
+                {getSyncIcon()}
+              </span>
+            )}
+          </div>
         </div>
         {showContextMenu && (
           <div
-            className="fixed bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded shadow-lg z-50 py-1"
+            className="file-tree-context-menu"
             style={{ left: `${menuPosition.x}px`, top: `${menuPosition.y}px` }}
           >
-            {/* Profile generation options */}
             {isRequired && node.profileMetadata?.hasCommand && (
               <>
                 <button
-                  className="w-full text-left px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 text-sm"
+                  className="file-tree-context-menu-item"
                   onClick={handleGenerateFile}
                 >
-                  ⚡ {isMissing ? 'Generate from Profile' : 'Regenerate'}
+                  <span>⚡</span>
+                  <span>{isMissing ? 'Generate from Profile' : 'Regenerate'}</span>
                 </button>
-                <div className="border-t border-gray-200 dark:border-gray-700 my-1"></div>
+                <div className="file-tree-context-menu-divider"></div>
               </>
             )}
 
-            {/* Context sync options */}
             {syncStatus?.status === 'synced' ? (
               <button
-                className="w-full text-left px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 text-sm"
+                className="file-tree-context-menu-item"
                 onClick={handleUnsyncFromContext}
               >
-                ✗ Remove from Context
+                <span>✗</span>
+                <span>Remove from Context</span>
               </button>
             ) : (
               <button
-                className="w-full text-left px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 text-sm"
+                className="file-tree-context-menu-item"
                 onClick={handleSyncToContext}
               >
-                ☁ Sync to Context
+                <span>☁</span>
+                <span>Sync to Context</span>
               </button>
             )}
           </div>
@@ -541,28 +286,25 @@ const FileNode = memo(({ node, currentPath, expandedPaths, onFileClick, onDirect
   }
 });
 
-/**
- * 樹列表組件 - 使用 memo 避免不必要的重新渲染
- */
 interface TreeListProps {
   nodes: TreeNode[];
   currentPath: string | null;
   expandedPaths: Set<string>;
   onFileClick: (path: string) => void;
   onDirectoryToggle: (path: string) => void;
-  onDirectoryClick?: (path: string) => void; // 添加目錄點擊處理函數
+  onDirectoryClick?: (path: string) => void;
 }
 
 const TreeList = memo(({ nodes, currentPath, expandedPaths, onFileClick, onDirectoryToggle, onDirectoryClick }: TreeListProps) => {
   return (
-    <ul className="pl-4">
+    <ul className="file-tree-list">
       {nodes.map((node) => (
-        <li key={node.path} className="py-1">
-          <FileNode 
-            node={node} 
-            currentPath={currentPath} 
-            expandedPaths={expandedPaths} 
-            onFileClick={onFileClick} 
+        <li key={node.path}>
+          <FileNode
+            node={node}
+            currentPath={currentPath}
+            expandedPaths={expandedPaths}
+            onFileClick={onFileClick}
             onDirectoryToggle={onDirectoryToggle}
             onDirectoryClick={onDirectoryClick}
           />
@@ -572,41 +314,260 @@ const TreeList = memo(({ nodes, currentPath, expandedPaths, onFileClick, onDirec
   );
 });
 
-/**
- * 渲染文件樹
- * @see /docs/solved_issues.md#22-文件樹展開閃爍問題
- * @see /docs/requirements.md#311-顯示目錄結構
- */
-const renderTree = (nodes: TreeNode[], currentPath: string | null, expandedPaths: Set<string>, handleFileClick: (path: string) => void, handleDirectoryToggle: (path: string) => void, handleDirectoryClick: (path: string) => void) => {
-  return (
-    <TreeList 
-      nodes={nodes} 
-      currentPath={currentPath} 
-      expandedPaths={expandedPaths} 
-      onFileClick={handleFileClick} 
-      onDirectoryToggle={handleDirectoryToggle}
-      onDirectoryClick={handleDirectoryClick}
-    />
-  );
-};
+function FileTreeComponent({ className }: FileTreeProps) {
+  const dispatch = useDispatch();
+  const files = useSelector((state: RootState) => state.files.fileList);
+  const loading = useSelector((state: RootState) => state.files.loading);
+  const error = useSelector((state: RootState) => state.files.error);
+  const refreshCounter = useSelector((state: RootState) => state.files.refreshCounter);
+  const expandedPathsSet = useSelector((state: RootState) => new Set(state.ui.expandedPaths));
+  const [treeData, setTreeData] = React.useState<TreeNode[]>([]);
+  const navigate = useNavigate();
+  const [lastUpdateTime, setLastUpdateTime] = useState(0);
+
+  const currentPath = window.location.pathname.startsWith('/edit/')
+    ? window.location.pathname.substring(6)
+    : null;
+
+  const fetchFiles = useCallback(async (showLoading = false) => {
+    try {
+      if (showLoading) {
+        dispatch(setLoading(true));
+      }
+
+      const fileList = await fileApi.getAllFiles();
+      const hasChanged = JSON.stringify(fileList) !== JSON.stringify(files);
+      if (hasChanged) {
+        dispatch(setFileList(fileList));
+        setLastUpdateTime(Date.now());
+      }
+
+      dispatch(setLoading(false));
+    } catch (err) {
+      dispatch(addNotification({
+        type: 'error',
+        message: 'Failed to fetch files',
+        title: 'Load Error'
+      }));
+      dispatch(setLoading(false));
+      console.error('Error fetching files:', err);
+    }
+  }, [dispatch, files]);
+
+  const refreshFiles = useCallback(async () => {
+    try {
+      dispatch(setLoading(true));
+      await fileApi.refreshFileCache();
+      await fetchFiles(false);
+    } catch (err) {
+      console.error('Error refreshing files:', err);
+      dispatch(addNotification({
+        type: 'error',
+        message: 'Failed to refresh files',
+        title: 'Refresh Error'
+      }));
+      dispatch(setLoading(false));
+    }
+  }, [dispatch, fetchFiles]);
+
+  useEffect(() => {
+    fetchFiles(files.length === 0);
+  }, [refreshCounter, fetchFiles, files.length]);
+
+  useEffect(() => {
+    connectWebSocket();
+
+    const handleFileAdded = (data: any) => {
+      console.log('File added via WebSocket:', data);
+      fetchFiles(false);
+    };
+
+    const handleFileChanged = (data: any) => {
+      console.log('File changed via WebSocket:', data);
+    };
+
+    const handleFileDeleted = (data: any) => {
+      console.log('File deleted via WebSocket:', data);
+      fetchFiles(false);
+    };
+
+    webSocketService.addEventListener('FILE_ADDED', handleFileAdded);
+    webSocketService.addEventListener('FILE_CHANGED', handleFileChanged);
+    webSocketService.addEventListener('FILE_DELETED', handleFileDeleted);
+
+    const handleConnection = (data: any) => {
+      if (data.status === 'connected') {
+        console.log('WebSocket connected, fetching files...');
+        fetchFiles(false);
+      }
+    };
+
+    webSocketService.addEventListener('connection', handleConnection);
+
+    const pollInterval = 60000;
+    const interval = setInterval(() => {
+      if (webSocketService.isConnected()) {
+        return;
+      }
+
+      const now = Date.now();
+      const timeSinceLastUpdate = now - lastUpdateTime;
+
+      if (lastUpdateTime > 0 && timeSinceLastUpdate < 5000) {
+        console.log('Skipping poll, last update was too recent');
+        return;
+      }
+
+      console.log('WebSocket not connected, using polling as fallback');
+      fetchFiles(false);
+    }, pollInterval);
+
+    return () => {
+      clearInterval(interval);
+      webSocketService.removeEventListener('FILE_ADDED', handleFileAdded);
+      webSocketService.removeEventListener('FILE_CHANGED', handleFileChanged);
+      webSocketService.removeEventListener('FILE_DELETED', handleFileDeleted);
+      webSocketService.removeEventListener('connection', handleConnection);
+    };
+  }, [fetchFiles, lastUpdateTime]);
+
+  useEffect(() => {
+    if (currentPath) {
+      const isDirectory = currentPath.endsWith('/') || !currentPath.includes('.');
+      const pathToExpand = isDirectory ? currentPath : currentPath.substring(0, currentPath.lastIndexOf('/'));
+      const pathParts = pathToExpand.split('/');
+      let currentDirPath = '';
+
+      for (let i = 0; i < pathParts.length; i++) {
+        if (pathParts[i]) {
+          currentDirPath = currentDirPath
+            ? `${currentDirPath}/${pathParts[i]}`
+            : pathParts[i];
+          dispatch(expandPath(currentDirPath));
+        }
+      }
+    }
+  }, [currentPath, dispatch]);
+
+  useEffect(() => {
+    const buildTree = (files: FileInfo[]) => {
+      const root: TreeNode[] = [];
+      const directoryMap: Record<string, TreeNode> = {};
+
+      if (!files || !Array.isArray(files)) {
+        console.warn('Files is not an array:', files);
+        return root;
+      }
+
+      files.forEach(file => {
+        const pathParts = file.path.split('/');
+        let currentPath = '';
+        for (let i = 0; i < pathParts.length - 1; i++) {
+          const part = pathParts[i];
+          const parentPath = currentPath;
+          currentPath = currentPath ? `${currentPath}/${part}` : part;
+
+          if (!directoryMap[currentPath]) {
+            const newDir: TreeNode = {
+              name: part,
+              children: [],
+              type: 'directory',
+              path: currentPath,
+            };
+            directoryMap[currentPath] = newDir;
+
+            if (parentPath) {
+              directoryMap[parentPath].children = directoryMap[parentPath].children || [];
+              directoryMap[parentPath].children?.push(newDir);
+            } else {
+              root.push(newDir);
+            }
+          }
+        }
+      });
+
+      files.forEach(file => {
+        const pathParts = file.path.split('/');
+        const fileName = pathParts[pathParts.length - 1];
+        const parentPath = pathParts.slice(0, -1).join('/');
+
+        const fileNode: TreeNode = {
+          name: fileName,
+          type: 'file',
+          path: file.path,
+          exists: file.exists !== undefined ? file.exists : true,
+          profileMetadata: file.profileMetadata,
+        };
+
+        if (parentPath && directoryMap[parentPath]) {
+          directoryMap[parentPath].children = directoryMap[parentPath].children || [];
+          directoryMap[parentPath].children?.push(fileNode);
+        } else {
+          root.push(fileNode);
+        }
+      });
+
+      const sortNodes = (nodes: TreeNode[]) => {
+        nodes.sort((a, b) => {
+          if (a.type === 'directory' && b.type === 'file') return -1;
+          if (a.type === 'file' && b.type === 'directory') return 1;
+          return a.name.localeCompare(b.name);
+        });
+        nodes.forEach(node => {
+          if (node.type === 'directory' && node.children) {
+            sortNodes(node.children);
+          }
+        });
+      };
+
+      sortNodes(root);
+      return root;
+    };
+
+    setTreeData(buildTree(files));
+  }, [files]);
+
+  const handleFileClick = (path: string) => {
+    navigate(`/edit/${path}`);
+  };
+
+  const handleDirectoryClick = (path: string) => {
+    const dirPath = path.endsWith('/') ? path : `${path}/`;
+    navigate(`/edit/${dirPath}`);
+  };
+
+  const handleDirectoryToggle = (path: string) => {
+    dispatch(togglePathExpanded(path));
+  };
+
+  const renderTree = (nodes: TreeNode[], currentPath: string | null, expandedPaths: Set<string>, handleFileClick: (path: string) => void, handleDirectoryToggle: (path: string) => void, handleDirectoryClick: (path: string) => void) => {
+    return (
+      <TreeList
+        nodes={nodes}
+        currentPath={currentPath}
+        expandedPaths={expandedPaths}
+        onFileClick={handleFileClick}
+        onDirectoryToggle={handleDirectoryToggle}
+        onDirectoryClick={handleDirectoryClick}
+      />
+    );
+  };
 
   if (loading) {
-    return <div className="p-4">Loading files...</div>;
+    return <div className="file-tree-loading">Loading files...</div>;
   }
 
   if (error) {
-    return <div className="p-4 text-red-500">{error}</div>;
+    return <div className="file-tree-loading" style={{ color: 'red' }}>{error}</div>;
   }
 
-  // 移除此處的 useMemo，避免 Hooks 順序錯誤
-
   return (
-    <div className={cn("p-4", className)}>
-      <div className="flex justify-between items-center mb-4">
-        <h2 className="text-lg font-semibold">Files</h2>
-        <div className="flex gap-2">
+    <div className={cn("file-tree-container", className)}>
+      <div className="file-tree-header">
+        <h2 className="file-tree-title">Files</h2>
+        <div className="file-tree-actions">
           <button
-            className="px-2 py-1 rounded text-sm bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600"
+            className="file-tree-refresh-btn"
             onClick={refreshFiles}
             title="Refresh file list"
           >
@@ -615,18 +576,16 @@ const renderTree = (nodes: TreeNode[], currentPath: string | null, expandedPaths
           <Button
             variant="outline"
             size="sm"
+            className="h-7 text-xs"
             onClick={() => {
-              // prompt 返回的可能是 null，所以需要確保它是字符串
               let fileName = prompt('Enter new file name:') || '';
               if (fileName) {
-                // 確保文件名以 .md 結尾
                 if (!fileName.toLowerCase().endsWith('.md')) {
                   fileName = `${fileName}.md`;
                 }
-                
+
                 fileApi.createFile(fileName, '# New File\n\nStart writing here...')
                   .then(() => {
-                    // 刷新文件列表，然後導航到新文件
                     dispatch(refreshFileList());
                     dispatch(addNotification({
                       type: 'success',
@@ -637,7 +596,6 @@ const renderTree = (nodes: TreeNode[], currentPath: string | null, expandedPaths
                   })
                   .catch(err => {
                     console.error('Error creating file:', err);
-                    // Error is handled by the API interceptor
                   });
               }
             }}
@@ -649,11 +607,10 @@ const renderTree = (nodes: TreeNode[], currentPath: string | null, expandedPaths
       {treeData.length > 0 ? (
         renderTree(treeData, currentPath, expandedPathsSet, handleFileClick, handleDirectoryToggle, handleDirectoryClick)
       ) : (
-        <div className="text-gray-500">No files found</div>
+        <div className="file-tree-empty">No files found</div>
       )}
     </div>
   );
 }
 
-// 使用 React.memo 包裝組件，避免不必要的重新渲染
 export const FileTree = React.memo(FileTreeComponent);

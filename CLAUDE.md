@@ -396,6 +396,13 @@ Profiles are stored in `~/.cospec-ai/profiles/<profile-name>/`:
 
 ### CLI Usage
 
+**List all available profiles:**
+```bash
+npx cospec-ai list-profiles
+```
+
+This displays all profiles found in `~/.cospec-ai/profiles/` with their name, version, description, and path.
+
 **Start CoSpec AI with a profile:**
 ```bash
 npx cospec-ai --profile api-development
