@@ -1,6 +1,12 @@
+# AInTandem
+.flexy-qwen/
+.flexy-claude/
+.flexy-gemini/
+.flexy-codex/
+.cospec-sync/
 .kai-notify.json
-.claude
 
+.pnpm-store/
 node_modules/
 work/
 dist/
