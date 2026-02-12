@@ -97,7 +97,7 @@ body:has(.profile-editor-app) #root {
   background: var(--pe-bg-primary);
   border-bottom: 1px solid var(--pe-border-color);
   box-shadow: var(--pe-shadow-sm);
-  padding: var(--pe-space-lg) var(--pe-space-xl);
+  padding: var(--pe-space-md) var(--pe-space-xl);
   position: sticky;
   top: 0;
   z-index: 50;
@@ -105,8 +105,8 @@ body:has(.profile-editor-app) #root {
 }
 
 .profile-editor-app header h1 {
-  font-size: 1.875rem;
-  font-weight: 700;
+  font-size: 1.25rem;
+  font-weight: 600;
   color: var(--pe-text-primary);
   margin: 0;
   letter-spacing: -0.025em;
@@ -114,8 +114,8 @@ body:has(.profile-editor-app) #root {
 
 .profile-editor-app header p {
   color: var(--pe-text-secondary);
-  font-size: 0.875rem;
-  margin: 0.25rem 0 0 0;
+  font-size: 0.75rem;
+  margin: 0.125rem 0 0 0;
 }
 
 /* Main Content Area */
@@ -696,11 +696,11 @@ body:has(.profile-editor-app) #root {
   }
 
   .profile-editor-app header {
-    padding: var(--pe-space-md) var(--pe-space-lg);
+    padding: var(--pe-space-sm) var(--pe-space-md);
   }
 
   .profile-editor-app header h1 {
-    font-size: 1.5rem;
+    font-size: 1.125rem;
   }
 
   .pe-editor-header {

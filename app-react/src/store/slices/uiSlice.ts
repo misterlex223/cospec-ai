@@ -3,6 +3,7 @@ import type { PayloadAction } from '@reduxjs/toolkit';
 
 export interface UiState {
   sidebarWidth: number;
+  graphPanelWidth: number;
   expandedPaths: string[];
   showFileInfo: boolean;
   darkMode: boolean;
@@ -10,6 +11,7 @@ export interface UiState {
 
 const initialState: UiState = {
   sidebarWidth: 280,
+  graphPanelWidth: 400,
   expandedPaths: [],
   showFileInfo: true,
   darkMode: false,
@@ -21,6 +23,9 @@ const uiSlice = createSlice({
   reducers: {
     setSidebarWidth: (state, action: PayloadAction<number>) => {
       state.sidebarWidth = action.payload;
+    },
+    setGraphPanelWidth: (state, action: PayloadAction<number>) => {
+      state.graphPanelWidth = action.payload;
     },
     togglePathExpanded: (state, action: PayloadAction<string>) => {
       if (state.expandedPaths.includes(action.payload)) {
@@ -48,6 +53,7 @@ const uiSlice = createSlice({
 
 export const {
   setSidebarWidth,
+  setGraphPanelWidth,
   togglePathExpanded,
   expandPath,
   collapsePath,

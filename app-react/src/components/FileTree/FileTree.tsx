@@ -22,6 +22,7 @@ import { togglePathExpanded, expandPath } from '../../store/slices/uiSlice';
 import { addNotification } from '../../store/slices/notificationsSlice';
 import { syncFileToContext, unsyncFileFromContext, fetchSyncStatus } from '../../store/slices/contextSlice';
 import { generateFile } from '../../store/slices/profileSlice';
+import { openTab } from '../../store/slices/tabsSlice';
 import { fileApi, type FileInfo } from '../../services/api';
 import { cn } from '../../lib/utils';
 import { Button } from '../ui/button';
@@ -129,6 +130,24 @@ const FileNode = memo(({ node, currentPath, expandedPaths, onFileClick, onDirect
         type: 'error',
         message: error.message || 'Failed to generate file',
         title: 'Generation Error'
+      }));
+    }
+    setShowContextMenu(false);
+  };
+
+  const handleOpenInNewTab = async () => {
+    try {
+      const response = await fileApi.getFileContent(node.path);
+      dispatch(openTab({
+        filePath: node.path,
+        content: response.content,
+        mode: 'new'
+      }));
+    } catch (error: any) {
+      dispatch(addNotification({
+        type: 'error',
+        message: error.message || 'Failed to open file',
+        title: 'Open Error'
       }));
     }
     setShowContextMenu(false);
@@ -249,6 +268,19 @@ const FileNode = memo(({ node, currentPath, expandedPaths, onFileClick, onDirect
             className="file-tree-context-menu"
             style={{ left: `${menuPosition.x}px`, top: `${menuPosition.y}px` }}
           >
+            {!isMissing && (
+              <>
+                <button
+                  className="file-tree-context-menu-item"
+                  onClick={handleOpenInNewTab}
+                >
+                  <span>📑</span>
+                  <span>Open in New Tab</span>
+                </button>
+                <div className="file-tree-context-menu-divider"></div>
+              </>
+            )}
+
             {isRequired && node.profileMetadata?.hasCommand && (
               <>
                 <button

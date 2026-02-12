@@ -317,6 +317,11 @@ const setupWatcher = async () => {
         if (relativePath.endsWith('.md')) {
           const content = await fs.readFile(filePath, 'utf-8');
           fileSyncManager.handleFileChange(relativePath, content);
+
+          // Link graph integration
+          if (linkManager.initialized) {
+            linkManager.handleFileChange(relativePath, content);
+          }
         }
       } catch (error) {
         console.error('[ContextSync] Error on file add:', error);
@@ -340,6 +345,11 @@ const setupWatcher = async () => {
         if (relativePath.endsWith('.md')) {
           const content = await fs.readFile(filePath, 'utf-8');
           fileSyncManager.handleFileChange(relativePath, content);
+
+          // Link graph integration
+          if (linkManager.initialized) {
+            linkManager.handleFileChange(relativePath, content);
+          }
         }
       } catch (error) {
         console.error('[ContextSync] Error on file change:', error);
@@ -362,6 +372,11 @@ const setupWatcher = async () => {
       try {
         if (relativePath.endsWith('.md')) {
           fileSyncManager.handleFileDelete(relativePath);
+
+          // Link graph integration
+          if (linkManager.initialized) {
+            linkManager.handleFileDelete(relativePath);
+          }
         }
       } catch (error) {
         console.error('[ContextSync] Error on file delete:', error);
@@ -455,6 +470,10 @@ app.get('/api/files/:path(*)', async (req, res) => {
 const fileSyncManager = require('./fileSyncManager');
 const kaiContextClient = require('./kaiContextClient');
 const profileManager = require('./profileManager');
+const LinkManager = require('./linkManager');
+
+// Initialize link manager
+const linkManager = new LinkManager(MARKDOWN_DIR);
 
 // POST /api/files/:path/sync-to-context - Manually mark file for sync
 app.post('/api/files/:path(*)/sync-to-context', authenticateToken, async (req, res) => {
@@ -525,6 +544,132 @@ app.get('/api/context-config', async (req, res) => {
     });
   } catch (error) {
     console.error('[ContextSync] Failed to get config:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ============================================================================
+// Link Graph API Routes
+// ============================================================================
+
+// GET /api/graph - Get full link graph
+app.get('/api/graph', async (req, res) => {
+  try {
+    const graph = linkManager.getFullGraph();
+    res.json(graph);
+  } catch (error) {
+    console.error('[LinkGraph] Failed to get full graph:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// GET /api/graph/:path - Get links for specific file
+app.get('/api/graph/:path(*)', async (req, res) => {
+  try {
+    const filePath = sanitizePath(req.params.path);
+    const links = linkManager.getLinksForFile(filePath);
+    res.json(links);
+  } catch (error) {
+    console.error('[LinkGraph] Failed to get links for file:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// POST /api/graph/add - Add link between files
+app.post('/api/graph/add', authenticateToken, async (req, res) => {
+  try {
+    const { from, to, type, relationType } = req.body;
+
+    if (!from || !to) {
+      return res.status(400).json({ error: 'Both "from" and "to" paths are required' });
+    }
+
+    const fromPath = sanitizePath(from);
+    const toPath = sanitizePath(to);
+
+    const edge = await linkManager.addLink(fromPath, toPath, type, relationType);
+
+    // Broadcast graph update
+    broadcastToClients({
+      type: 'LINK_GRAPH_UPDATED',
+      action: 'LINK_ADDED',
+      edge
+    });
+
+    res.json({ success: true, edge });
+  } catch (error) {
+    console.error('[LinkGraph] Failed to add link:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// DELETE /api/graph/:from/:to - Remove link between files
+app.delete('/api/graph/:from(*)/:to(*)', authenticateToken, async (req, res) => {
+  try {
+    const fromPath = sanitizePath(req.params.from);
+    const toPath = sanitizePath(req.params.to);
+    const { relationType } = req.query;
+
+    const removed = await linkManager.removeLink(fromPath, toPath, relationType);
+
+    if (removed) {
+      // Broadcast graph update
+      broadcastToClients({
+        type: 'LINK_GRAPH_UPDATED',
+        action: 'LINK_REMOVED',
+        from: fromPath,
+        to: toPath,
+        relationType
+      });
+    }
+
+    res.json({ success: removed, removed });
+  } catch (error) {
+    console.error('[LinkGraph] Failed to remove link:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// POST /api/graph/rebuild - Force rebuild graph cache
+app.post('/api/graph/rebuild', authenticateToken, async (req, res) => {
+  try {
+    await linkManager.rebuildGraph();
+
+    // Broadcast graph update
+    broadcastToClients({
+      type: 'LINK_GRAPH_UPDATED',
+      action: 'GRAPH_REBUILT'
+    });
+
+    res.json({ success: true, message: 'Graph rebuilt successfully' });
+  } catch (error) {
+    console.error('[LinkGraph] Failed to rebuild graph:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// GET /api/graph/validate - Validate all links
+app.get('/api/graph/validate', async (req, res) => {
+  try {
+    const validation = linkManager.validateGraph();
+    res.json(validation);
+  } catch (error) {
+    console.error('[LinkGraph] Failed to validate graph:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// GET /api/graph/export - Export graph as JSON
+app.get('/api/graph/export', async (req, res) => {
+  try {
+    const format = req.query.format || 'json';
+    const exported = linkManager.exportGraph(format);
+
+    res.setHeader('Content-Type', 'application/json');
+    res.setHeader('Content-Disposition', `attachment; filename="link-graph.${format}"`);
+    res.send(exported);
+  } catch (error) {
+    console.error('[LinkGraph] Failed to export graph:', error);
     res.status(500).json({ error: error.message });
   }
 });
@@ -1362,6 +1507,14 @@ server.listen(PORT, async () => {
     } catch (err) {
       console.error(`Failed to load profile "${profileName}":`, err.message);
     }
+  }
+
+  // Initialize link manager
+  try {
+    await linkManager.initialize();
+    console.log('Link manager initialized successfully');
+  } catch (err) {
+    console.error('Error initializing link manager:', err);
   }
 
   try {

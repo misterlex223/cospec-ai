@@ -237,3 +237,95 @@ export const validateProfile = async (): Promise<ProfileValidation> => {
   const response = await api.get('/profile/validate');
   return response.data;
 };
+
+// Graph API
+import type { Graph, GraphEdge } from '../store/slices/graphSlice';
+
+export interface LinkInfo {
+  filePath: string;
+  outgoing: GraphEdge[];
+  incoming: GraphEdge[];
+  total: number;
+}
+
+export interface GraphValidation {
+  valid: boolean;
+  errors: Array<{
+    message: string;
+    code?: string;
+    details?: any;
+  }>;
+  warnings: Array<{
+    message: string;
+    code?: string;
+    details?: any;
+  }>;
+}
+
+export const graphApi = {
+  /**
+   * Get full link graph
+   */
+  getGraph: async (): Promise<Graph> => {
+    const response = await api.get('/graph');
+    return response.data;
+  },
+
+  /**
+   * Get links for specific file
+   */
+  getFileLinks: async (filePath: string): Promise<LinkInfo> => {
+    const response = await api.get(`/graph/${encodeURIComponent(filePath)}`);
+    return response.data;
+  },
+
+  /**
+   * Add a link between files
+   */
+  addLink: async (from: string, to: string, type?: string, relationType?: string): Promise<{ success: boolean; edge: GraphEdge }> => {
+    const response = await api.post('/graph/add', {
+      from,
+      to,
+      type: type || 'wikilink',
+      relationType
+    });
+    return response.data;
+  },
+
+  /**
+   * Remove a link between files
+   */
+  removeLink: async (from: string, to: string, relationType?: string): Promise<{ success: boolean; removed: boolean }> => {
+    const url = `/graph/${encodeURIComponent(from)}/${encodeURIComponent(to)}`;
+    const params = relationType ? { relationType } : {};
+    const response = await api.delete(url, { params });
+    return response.data;
+  },
+
+  /**
+   * Rebuild graph cache
+   */
+  rebuildGraph: async (): Promise<{ success: boolean; message: string }> => {
+    const response = await api.post('/graph/rebuild');
+    return response.data;
+  },
+
+  /**
+   * Validate graph integrity
+   */
+  validateGraph: async (): Promise<GraphValidation> => {
+    const response = await api.get('/graph/validate');
+    return response.data;
+  },
+
+  /**
+   * Export graph data
+   */
+  exportGraph: async (format: string = 'json'): Promise<Blob> => {
+    const response = await api.get('/graph/export', {
+      params: { format },
+      responseType: 'blob'
+    });
+    return response.data;
+  }
+};

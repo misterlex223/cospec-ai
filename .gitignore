@@ -8,6 +8,7 @@
 
 .pnpm-store/
 node_modules/
+vditor/
 work/
 dist/
 .DS_Store

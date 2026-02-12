@@ -127,8 +127,11 @@ export function MarkdownEditor({ filePath, className }: MarkdownEditorProps) {
               mode: 'wysiwyg',
               value: fileContent, // 直接使用 fileContent 參數
               placeholder: 'Start editing...',
-              // 只使用最基本的工具欄按鈕，避免複雜的配置選項
-              toolbar: ['bold', 'italic', 'headings', 'link', 'upload', 'undo', 'redo'],
+              // 使用完整的工具欄配置對象而不是簡單數組
+              toolbarConfig: {
+                hide: false,
+                pin: false,
+              },
               cache: { enable: false },
               input: (value: string) => {
                 setContent(value);
@@ -223,15 +226,8 @@ export function MarkdownEditor({ filePath, className }: MarkdownEditorProps) {
               }
             };
 
-            // 在初始化前驗證配置對象
+            // 初始化 Vditor
             try {
-              // 確保工具欄是數組
-              if (vditorConfig.toolbar && !Array.isArray(vditorConfig.toolbar)) {
-                console.error('Vditor toolbar config is not an array:', typeof vditorConfig.toolbar, vditorConfig.toolbar);
-                vditorConfig.toolbar = [];
-              }
-
-              // 初始化 Vditor
               vditorRef.current = new Vditor(editorRef.current, vditorConfig);
             } catch (error) {
               console.error('Error initializing Vditor:', error);
@@ -364,12 +360,12 @@ export function MarkdownEditor({ filePath, className }: MarkdownEditorProps) {
   return (
     <div className={cn("relative h-full flex flex-col", className)}>
       {/* 檔案名稱標題 - 只在滑到頂部時顯示，但不會影響工具欄操作 */}
-      <div className={`file-info-header ${showFileInfo ? 'visible' : 'hidden'}`}>
+      {/* <div className={`file-info-header ${showFileInfo ? 'visible' : 'hidden'}`}>
         <h2 className="text-lg font-semibold truncate" title={fileName}>
-          <span className="mr-2">📄</span> {/* 檔案圖標 */}
+          <span className="mr-2">📄</span>
           {fileName}
         </h2>
-      </div>
+      </div> */}
 
       {/* 編輯器容器 - 確保工具欄可見 */}
       <div className="flex-1 relative">

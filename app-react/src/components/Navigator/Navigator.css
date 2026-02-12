@@ -8,6 +8,8 @@
   height: 48px;
   position: relative;
   z-index: 50;
+  flex-shrink: 0;
+  width: 100%;
 }
 
 .navigator-controls {

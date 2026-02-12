@@ -12,11 +12,13 @@ The CoSpec AI Markdown Editor is a containerized application that provides a Rea
 
 ### Frontend (React)
 - **Framework**: React 19 + TypeScript + Vite
-- **State Management**: Redux Toolkit with slices for files, UI, editor, and notifications
+- **State Management**: Redux Toolkit with slices for files, UI, editor, notifications, graph, and tabs
 - **Routing**: React Router with **HashRouter** (for reverse proxy compatibility)
 - **Styling**: Tailwind CSS with shadcn/ui components
 - **Markdown Editor**: Vditor library
+- **Graph Visualization**: @xyflow/react (React Flow) with dagre layout
 - **WebSocket**: Socket.IO client for real-time communication with backend
+- **Multi-Document Tabs**: Horizontal tab bar with LRU eviction (max 10 tabs)
 - **Location**: `/app-react/`
 - **Build Configuration**: Uses relative paths (`base: './'`) for reverse proxy support
 
@@ -25,7 +27,8 @@ The CoSpec AI Markdown Editor is a containerized application that provides a Rea
 - **File Operations**: CRUD operations for Markdown files with security validations
 - **File Watching**: Uses chokidar to monitor file changes and update clients via WebSocket
 - **Context Sync**: Integrates with Kai's context system to sync markdown files as memories
-- **Sync Metadata**: Stores sync state in `.cospec-sync/sync-metadata.json` (does NOT modify original files)
+- **Link Graph Management**: Extracts and manages document relationships (wikilinks, markdown links, typed relationships)
+- **Sync Metadata**: Stores sync state in `.cospec-sync/sync-metadata.json` and link graph in `.cospec-sync/link-graph.json` (does NOT modify original files)
 - **Security**: Helmet, CORS, rate limiting, path sanitization, and basic token authentication
 - **Location**: `/server/`
 
@@ -298,6 +301,316 @@ If deploying behind a different reverse proxy:
    npm run build -- --base=/custom-path/
    ```
    However, using `./` is recommended for maximum flexibility.
+
+## Graph Diagram & Multi-Document Features
+
+CoSpec AI includes an Obsidian-like graph diagram feature for visualizing document relationships, plus multi-document tab support for editing multiple files simultaneously.
+
+### Link Types Supported
+
+**1. Simple Wikilinks:**
+```markdown
+[[document-name]]
+[[folder/document.md]]
+```
+
+**2. Typed Wikilinks (with relationships):**
+```markdown
+[[api-spec|type:depends-on]]
+[[requirements/auth|type:implements]]
+```
+
+**Supported Relation Types:**
+- `depends-on` - Source depends on target
+- `related-to` - General relationship
+- `implements` - Source implements target
+- `references` - Source references target
+- `extends` - Source extends target
+- `supersedes` - Source supersedes target
+- `parent-of` / `child-of` - Hierarchical relationships
+
+**3. Standard Markdown Links:**
+```markdown
+[Link Text](path/to/file.md)
+[Relative Link](./file.md)
+[Absolute Link](/specs/api.md)
+```
+
+### Link Graph Storage
+
+**Important**: CoSpec AI does NOT modify original markdown files. All link metadata is stored separately in `.cospec-sync/link-graph.json`.
+
+**Graph Structure:**
+```json
+{
+  "nodes": [
+    {
+      "id": "specs/api.md",
+      "label": "api",
+      "path": "specs/api.md",
+      "type": "file",
+      "exists": true,
+      "metadata": {
+        "size": 1024,
+        "modified": "2025-01-23T10:30:00.000Z",
+        "tags": [],
+        "title": null
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "specs/api.md->requirements/auth.md-depends-on",
+      "from": "specs/api.md",
+      "to": "requirements/auth.md",
+      "type": "typed_wikilink",
+      "relationType": "depends-on",
+      "bidirectional": false,
+      "metadata": {
+        "sourceLineNumber": 10,
+        "context": "Authentication is defined in [[requirements/auth|type:depends-on]]"
+      }
+    }
+  ],
+  "metadata": {
+    "version": 1,
+    "lastUpdated": "2025-01-23T10:30:00.000Z",
+    "totalNodes": 15,
+    "totalEdges": 23,
+    "orphanedNodes": [],
+    "brokenLinks": []
+  }
+}
+```
+
+### Backend Components
+
+**Link Manager (`server/linkManager.js`):**
+- Scans all markdown files on startup
+- Builds in-memory link graph
+- Integrates with file watcher for real-time updates
+- Stores metadata in `.cospec-sync/link-graph.json`
+- Debounced file change handling (3 second delay)
+
+**Link Parser (`server/linkParser.js`):**
+- Extracts `[[wikilinks]]`, `[[file|type:relation]]`, and `[text](path.md)`
+- Creates bidirectional links automatically
+- Resolves relative paths
+- Extracts frontmatter metadata
+
+**Shared Validation (`server/shared/`):**
+- `linkSchema.js` - Link types, patterns, validation rules (single source of truth)
+- `linkValidation.js` - Validation functions for runtime and CLI
+
+### Backend API Endpoints
+
+**Graph Operations:**
+- `GET /api/graph` - Get full link graph
+- `GET /api/graph/:path` - Get links for specific file (incoming + outgoing)
+- `POST /api/graph/add` - Add link between files (requires auth)
+  ```json
+  { "from": "specs/api.md", "to": "requirements/auth.md", "type": "wikilink", "relationType": "depends-on" }
+  ```
+- `DELETE /api/graph/:from/:to` - Remove link (requires auth)
+- `POST /api/graph/rebuild` - Force rebuild graph cache (requires auth)
+- `GET /api/graph/validate` - Validate link integrity
+- `GET /api/graph/export` - Export graph as JSON
+
+**WebSocket Events:**
+- `LINK_GRAPH_UPDATED` - Broadcast when links change
+  ```json
+  {
+    "type": "LINK_GRAPH_UPDATED",
+    "action": "LINK_ADDED" | "LINK_REMOVED" | "GRAPH_REBUILT",
+    "edge": { ... }
+  }
+  ```
+
+### CLI Commands for AI Tools
+
+```bash
+# List all links in a document
+cospec-ai links list --file "specs/api.md"
+
+# Add a link between documents
+cospec-ai links add --source "specs/api.md" --target "requirements/auth.md" --type "depends-on"
+
+# Remove a link
+cospec-ai links remove --source "specs/api.md" --target "requirements/auth.md"
+
+# Validate all links (check for broken links, circular dependencies)
+cospec-ai links validate
+
+# Export graph as JSON
+cospec-ai links export --format json --output graph.json
+
+# Display AI-friendly usage guide
+cospec-ai links usage
+```
+
+**CLI Validation Features:**
+- Broken links (targets don't exist)
+- Circular dependencies
+- Orphaned files (no incoming or outgoing links)
+- Invalid syntax
+- Path security (directory traversal prevention)
+
+### Multi-Document Tabs
+
+**Tab Management:**
+- Horizontal tab bar above editor
+- Maximum 10 tabs (LRU eviction when exceeded)
+- Dirty indicator (*) for unsaved changes
+- Close button (X) on each tab
+- Drag-to-reorder support
+
+**Redux State (`app-react/src/store/slices/tabsSlice.ts`):**
+```typescript
+interface Tab {
+  filePath: string;
+  content: string;
+  isDirty: boolean;
+  lastModified: number;
+}
+```
+
+**Opening Modes:**
+- `new` - Always open in new tab
+- `replace` - Replace currently active tab
+- `smart` - New tab if Ctrl/Cmd held, otherwise replace active tab
+
+**Keyboard Shortcuts (Non-conflicting with browser):**
+- `Alt+Left` / `Alt+Right` - Navigate between tabs
+- `Alt+W` - Close active tab
+- `Alt+Shift+W` - Close all tabs (with confirmation)
+- Middle-click tab - Close tab
+- `Alt+G` - Toggle graph fullscreen (when graph is open)
+
+**UI Controls:**
+- Previous/Next buttons for tab navigation
+- Close button (X) on each tab
+- Close active tab button
+- Close other tabs button
+- Tab counter (shows current/max tabs)
+
+### Graph Visualization
+
+**Frontend Components:**
+- Uses `@xyflow/react` (React Flow) for graph rendering
+- `dagre` for automatic layout algorithms
+- Split panel view (file tree | editor/tabs | graph)
+- Fullscreen toggle for graph view
+
+**Interaction:**
+- **Click node** - Smart open (Ctrl/Cmd = new tab, otherwise replace active tab)
+- **Double-click node** - Always open in new tab
+- **Hover node** - Tooltip with filename and link count
+- **Click edge** - Highlight source and target nodes
+
+**Layout Options:**
+- Force-directed layout
+- Hierarchical layout
+
+**Filters & Controls:**
+- **Filter button** - Toggle filter panel
+- **Show only connected to active file** - Display only nodes directly linked to the currently open document
+- **Show orphaned files** - Include/exclude files with no incoming or outgoing links
+- **Fullscreen button** - Expand graph to fullscreen mode (Alt+G)
+
+**Visual Indicators:**
+- **Blue highlighted node** - Currently active file
+- **Red/pink nodes** - Missing files (broken links)
+- **Animated edges** - Typed relationships
+- **Edge labels** - Relationship types (depends-on, implements, etc.)
+
+### File Watcher Integration
+
+The linkManager integrates with chokidar file watcher:
+
+**On file add:**
+```javascript
+linkManager.handleFileChange(relativePath, content);
+```
+
+**On file change:**
+```javascript
+linkManager.handleFileChange(relativePath, content); // Debounced 3s
+```
+
+**On file delete:**
+```javascript
+linkManager.handleFileDelete(relativePath);
+```
+
+**Watcher Configuration:**
+- Ignores `.cospec-sync/**` to prevent infinite loops
+- Monitors `**/*.md` files only
+- Real-time WebSocket broadcasts to all clients
+
+### Validation & Error Detection
+
+**Runtime Validation:**
+- Link syntax validation (wikilink/markdown)
+- Link type validation (typed relationships)
+- Path sanitization (directory traversal prevention)
+- Broken link detection
+- Circular dependency detection
+
+**CLI Validation:**
+Uses same validation library (`server/shared/linkValidation.js`) as runtime - single source of truth.
+
+**Example Validation Output:**
+```bash
+$ cospec-ai links validate
+
+Graph Validation Results:
+
+Status: ✓ Valid
+
+Warnings (2):
+  1. Found 3 broken link(s)
+     Details: [
+       {
+         "from": "specs/api.md",
+         "to": "missing-file.md",
+         "error": "Target file does not exist"
+       }
+     ]
+  2. Found 5 orphaned file(s) with no links
+     Details: ["standalone.md", "notes/old.md", ...]
+```
+
+### Design Principles
+
+1. **No File Pollution**: Original markdown files are never modified for link tracking
+2. **Separation of Concerns**: Link metadata stored in dedicated `.cospec-sync/link-graph.json`
+3. **Single Source of Truth**: Shared validation library for runtime and CLI
+4. **Bidirectional Links**: Backlinks automatically tracked
+5. **Debouncing**: File changes debounced to avoid excessive API calls
+6. **LRU Eviction**: Oldest tabs automatically closed when limit exceeded
+7. **Smart Navigation**: Graph clicks intelligently open files based on modifier keys
+
+### Best Practices for Link Management
+
+**1. Link Naming:**
+- Use descriptive file names (links are based on file paths)
+- Organize related files in folders
+- Use typed relationships for semantic meaning
+
+**2. Avoiding Broken Links:**
+- Run `cospec-ai links validate` regularly
+- Check validation warnings before committing
+- Use relative paths for files in same directory
+
+**3. Managing Large Graphs:**
+- Use filters to focus on relevant connections
+- Leverage hierarchical layout for complex relationships
+- Export graph data for external analysis
+
+**4. AI Integration:**
+- Use CLI commands in automation scripts
+- Export graph as JSON for AI consumption
+- Validate links in CI/CD pipelines
 
 ## Context Sync Integration
 
