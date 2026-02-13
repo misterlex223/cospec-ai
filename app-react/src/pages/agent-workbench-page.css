@@ -1,0 +1,33 @@
+.agent-workbench-page {
+  min-height: 100vh;
+  background: #f9fafb;
+  padding: 2rem;
+}
+
+.workbench-container {
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.workbench-header {
+  margin-bottom: 2rem;
+}
+
+.workbench-header h1 {
+  font-size: 2rem;
+  font-weight: 700;
+  color: #1f2937;
+  margin: 0 0 0.5rem 0;
+}
+
+.workbench-subtitle {
+  color: #6b7280;
+  margin: 0;
+}
+
+.history-section h2 {
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: #1f2937;
+  margin-bottom: 1rem;
+}

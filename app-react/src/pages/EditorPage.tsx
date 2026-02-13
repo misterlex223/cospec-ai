@@ -2,10 +2,12 @@ import React, { useState, useCallback, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 import { useSelector, useDispatch } from 'react-redux';
 import { setSidebarWidth } from '../store/slices/uiSlice';
+import { togglePanel } from '../store/slices/agentSlice';
 import { FileTree } from '../components/FileTree/FileTree';
 import { MarkdownEditor } from '../components/MarkdownEditor/MarkdownEditor';
 import { DirectoryViewer } from '../components/DirectoryViewer/DirectoryViewer';
 import { Navigator } from '../components/Navigator/Navigator';
+import { Bot } from 'lucide-react';
 import type { RootState } from '../store';
 
 export function EditorPage() {
@@ -122,6 +124,13 @@ export function EditorPage() {
             title="Refresh file list"
           >
             🔄 {/* 刷新圖標 */}
+          </button>
+          <button
+            style={{ padding: '0.25rem', borderRadius: '0.25rem', cursor: 'pointer', marginLeft: '0.5rem' }}
+            onClick={() => dispatch(togglePanel())}
+            title="AI Agent Panel"
+          >
+            <Bot size={20} />
           </button>
         </div>
         <div style={{ flex: 1, overflowY: 'auto' }}>
