@@ -1,0 +1,46 @@
+{
+  "currentVersion": "1.1.1",
+  "nextVersion": "1.2.0",
+  "nextVersionType": "minor",
+  "status": "in-development",
+  "lastUpdated": "2026-02-13T00:00:00.000Z",
+  "features": [
+    {
+      "id": "claude-ai-chat-integration",
+      "name": "Claude AI Chat Integration",
+      "version": "1.2.0",
+      "type": "feature",
+      "status": "pending",
+      "description": "Integrate Claude Agent SDK for AI chat with streaming responses, multimodal input, and improved UX"
+    }
+  ],
+  "releaseChecklist": {
+    "featuresComplete": false,
+    "tested": false,
+    "docsUpdated": true,
+    "migrationReady": false
+  },
+  "versionHistory": [
+    {
+      "version": "1.1.1",
+      "date": "2026-02-12",
+      "type": "patch",
+      "description": "Server config changes and dependency updates",
+      "released": true
+    },
+    {
+      "version": "1.1.0",
+      "date": "2025-12-21",
+      "type": "minor",
+      "description": "Profile Editor with improved layout and CSS isolation",
+      "released": true
+    },
+    {
+      "version": "1.0.0",
+      "date": "TBD",
+      "type": "major",
+      "description": "Initial release",
+      "released": false
+    }
+  ]
+}

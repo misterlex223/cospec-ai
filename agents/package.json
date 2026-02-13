@@ -1,0 +1,26 @@
+{
+  "name": "@cospec-ai/agents",
+  "version": "1.0.0",
+  "description": "CoSpec AI Agent Integration - Document management and development workflow",
+  "main": "index.ts",
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch index.ts",
+    "build": "tsc",
+    "typecheck": "tsc --noEmit",
+    "start": "tsx index.ts"
+  },
+  "keywords": ["claude", "agent", "sdk", "document-management"],
+  "author": "lex.yang",
+  "license": "MIT",
+  "packageManager": "pnpm@10.26.2",
+  "dependencies": {
+    "@anthropic-ai/claude-agent-sdk": "^0.2.39"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "typescript": "^5.0.0",
+    "tsx": "^4.0.0",
+    "zod": "^4.0.0"
+  }
+}

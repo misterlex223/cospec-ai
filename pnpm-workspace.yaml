@@ -1,6 +1,7 @@
 packages:
   - app-react
   - server
+  - agents
 
 onlyBuiltDependencies:
   - esbuild
