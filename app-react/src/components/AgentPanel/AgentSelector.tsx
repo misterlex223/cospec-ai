@@ -1,68 +1,74 @@
 /**
  * Agent Selector Component
  *
- * Allows user to select agent type
+ * Dynamically loads and displays available agent types
  */
 
-import React from 'react';
-import { FileText, Code, FileCheck, Tag } from 'lucide-react';
-import type { AgentType } from '../../types/agent';
+import React, { useEffect } from 'react';
+import { useSelector, useDispatch } from 'react-redux';
+import { FileText, Code, FileCheck, Tag, Loader2 } from 'lucide-react';
+import type { RootState, AppDispatch } from '../../store';
+import { fetchAgentTypes } from '../../store/slices/agentSlice';
+import type { AgentType } from '../../services/api';
 
 interface AgentSelectorProps {
-  selectedAgent: AgentType | null;
-  onAgentChange: (agent: AgentType) => void;
+  selectedAgent: string | null;
+  onAgentChange: (agent: string) => void;
 }
 
-const AGENT_OPTIONS: Array<{
-  type: AgentType;
-  label: string;
-  icon: React.ReactNode;
-  description: string;
-}> = [
-  {
-    type: 'prd-analyzer',
-    label: 'PRD Analyzer',
-    icon: <FileText size={20} />,
-    description: '分析 PRD 的完整性、清晰度、可行性'
-  },
-  {
-    type: 'code-reviewer',
-    label: 'Code Reviewer',
-    icon: <Code size={20} />,
-    description: '代碼審查（安全性、品質、效能）'
-  },
-  {
-    type: 'doc-generator',
-    label: 'Doc Generator',
-    icon: <FileCheck size={20} />,
-    description: '從程式碼生成 API 文檔、使用指南'
-  },
-  {
-    type: 'version-advisor',
-    label: 'Version Advisor',
-    icon: <Tag size={20} />,
-    description: '根據 SemVer 建議版本號和發布策略'
-  }
-];
+// Icon mapping for agent types
+const AGENT_ICONS: Record<string, React.ReactNode> = {
+  'general': <Tag size={20} />,
+  'prd-analyzer': <FileText size={20} />,
+  'code-reviewer': <Code size={20} />,
+  'doc-generator': <FileCheck size={20} />,
+  'version-advisor': <Tag size={20} />,
+  'bot': <Tag size={20} />,
+  'file-text': <FileText size={20} />,
+  'file-output': <FileCheck size={20} />,
+};
 
 export function AgentSelector({ selectedAgent, onAgentChange }: AgentSelectorProps) {
+  const dispatch = useDispatch<AppDispatch>();
+  const agentTypes = useSelector((state: RootState) => state.agent.agentTypes);
+  const isLoading = useSelector((state: RootState) => state.agent.isLoading);
+
+  // Fetch agent types on mount
+  useEffect(() => {
+    if (agentTypes.length === 0) {
+      dispatch(fetchAgentTypes());
+    }
+  }, [dispatch]);
+
   return (
     <div className="agent-selector">
       <label className="pe-label">選擇 Agent 類型</label>
       <div className="agent-options">
-        {AGENT_OPTIONS.map(option => (
-          <button
-            key={option.type}
-            className={`agent-option ${selectedAgent === option.type ? 'selected' : ''}`}
-            onClick={() => onAgentChange(option.type)}
-          >
-            <div className="agent-option-icon">{option.icon}</div>
-            <div className="agent-option-content">
-              <div className="agent-option-label">{option.label}</div>
-              <div className="agent-option-description">{option.description}</div>
-            </div>
-          </button>
-        ))}
+        {isLoading ? (
+          <div className="agent-loading">
+            <Loader2 size={16} className="spin-icon" />
+            載入中...
+          </div>
+        ) : agentTypes.length === 0 ? (
+          <div className="agent-empty">無可用的 Agent 類型</div>
+        ) : (
+          agentTypes.map((agent) => (
+            <button
+              key={agent.id}
+              className={`agent-option ${selectedAgent === agent.id ? 'selected' : ''}`}
+              onClick={() => onAgentChange(agent.id)}
+              title={agent.description}
+            >
+              <div className="agent-option-icon">
+                {AGENT_ICONS[agent.icon] || AGENT_ICONS[agent.id] || <Tag size={20} />}
+              </div>
+              <div className="agent-option-content">
+                <div className="agent-option-label">{agent.name}</div>
+                <div className="agent-option-description">{agent.description}</div>
+              </div>
+            </button>
+          ))
+        )}
       </div>
     </div>
   );

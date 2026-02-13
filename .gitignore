@@ -19,3 +19,4 @@ app-react/playwright-report/
 app-react/test-results/
 
 agent-history.db
+.agent-output

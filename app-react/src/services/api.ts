@@ -237,3 +237,110 @@ export const validateProfile = async (): Promise<ProfileValidation> => {
   const response = await api.get('/profile/validate');
   return response.data;
 };
+
+// ============================================================================
+// Agent API
+// ============================================================================
+
+export interface AgentType {
+  id: string;
+  name: string;
+  description: string;
+  icon: string;
+  capabilities: string[];
+}
+
+export interface AgentSuggestion {
+  id: string;
+  text: string;
+  prompt: string;
+}
+
+export interface ChatMessage {
+  id: string;
+  role: 'user' | 'assistant';
+  content: string;
+  timestamp: string;
+}
+
+export interface Conversation {
+  id: string;
+  agentType: string;
+  messages: ChatMessage[];
+  contextFiles: string[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ChatResponse {
+  conversationId: string;
+  messageId: string;
+  status: 'processing' | 'streaming' | 'completed' | 'error';
+}
+
+/**
+ * Get available agent types
+ */
+export const getAgentTypes = async (): Promise<{ types: AgentType[] }> => {
+  const response = await api.get('/agent/types');
+  return response.data;
+};
+
+/**
+ * Get specific agent type details
+ */
+export const getAgentType = async (id: string): Promise<AgentType> => {
+  const response = await api.get(`/agent/types/${id}`);
+  return response.data;
+};
+
+/**
+ * Get context-aware suggestions
+ */
+export const getAgentSuggestions = async (file?: string): Promise<{ suggestions: AgentSuggestion[] }> => {
+  const params = file ? { file } : {};
+  const response = await api.get('/agent/suggestions', { params });
+  return response.data;
+};
+
+/**
+ * Send chat message to agent
+ */
+export const sendAgentChat = async (
+  message: string,
+  options?: {
+    contextFiles?: string[];
+    agentType?: string;
+    conversationId?: string;
+  }
+): Promise<ChatResponse> => {
+  const response = await api.post('/agent/chat', {
+    message,
+    ...options
+  });
+  return response.data;
+};
+
+/**
+ * Get all conversations
+ */
+export const getConversations = async (): Promise<{ conversations: Conversation[] }> => {
+  const response = await api.get('/agent/conversations');
+  return response.data;
+};
+
+/**
+ * Get single conversation
+ */
+export const getConversation = async (id: string): Promise<Conversation> => {
+  const response = await api.get(`/agent/conversations/${id}`);
+  return response.data;
+};
+
+/**
+ * Delete conversation
+ */
+export const deleteConversation = async (id: string): Promise<{ success: boolean }> => {
+  const response = await api.delete(`/agent/conversations/${id}`);
+  return response.data;
+};

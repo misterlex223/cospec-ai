@@ -6,9 +6,32 @@
 
 import { store } from '../store';
 import { addExecution, updateExecution } from '../store/slices/agentSlice';
+import type { ChatMessage } from './api';
 import webSocketService from './websocket';
 
 let isConnected = false;
+
+// Event callbacks registry for chat events
+const chatEventCallbacks = new Map<string, Set<(data: any) => void>>();
+
+export function onChatEvent(conversationId: string, event: string, callback: (data: any) => void) {
+  const key = `${conversationId}:${event}`;
+  if (!chatEventCallbacks.has(key)) {
+    chatEventCallbacks.set(key, new Set());
+  }
+  chatEventCallbacks.get(key)!.add(callback);
+
+  // Return unsubscribe function
+  return () => {
+    const callbacks = chatEventCallbacks.get(key);
+    if (callbacks) {
+      callbacks.delete(callback);
+      if (callbacks.size === 0) {
+        chatEventCallbacks.delete(key);
+      }
+    }
+  };
+}
 
 export function connectAgentWebSocket() {
   if (isConnected) {
@@ -55,6 +78,50 @@ export function connectAgentWebSocket() {
       id: data.executionId,
       summary: data.output.slice(0, 200)
     }));
+  });
+
+  // ========================================================================
+  // Chat-related WebSocket events
+  // ========================================================================
+
+  // Chat message received (user message confirmation)
+  webSocketService.addEventListener('agent-chat-message', (data: any) => {
+    const { conversationId, message } = data;
+    const key = `${conversationId}:message`;
+    const callbacks = chatEventCallbacks.get(key);
+    if (callbacks) {
+      callbacks.forEach(cb => cb(data));
+    }
+  });
+
+  // Chat streaming chunk
+  webSocketService.addEventListener('agent-chat-chunk', (data: any) => {
+    const { conversationId, messageId, chunk, done } = data;
+    const key = `${conversationId}:chunk`;
+    const callbacks = chatEventCallbacks.get(key);
+    if (callbacks) {
+      callbacks.forEach(cb => cb(data));
+    }
+  });
+
+  // Chat complete
+  webSocketService.addEventListener('agent-chat-complete', (data: any) => {
+    const { conversationId, messageId, response } = data;
+    const key = `${conversationId}:complete`;
+    const callbacks = chatEventCallbacks.get(key);
+    if (callbacks) {
+      callbacks.forEach(cb => cb(data));
+    }
+  });
+
+  // Chat error
+  webSocketService.addEventListener('agent-chat-error', (data: any) => {
+    const { conversationId, messageId, error } = data;
+    const key = `${conversationId}:error`;
+    const callbacks = chatEventCallbacks.get(key);
+    if (callbacks) {
+      callbacks.forEach(cb => cb(data));
+    }
   });
 
   isConnected = true;

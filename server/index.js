@@ -999,6 +999,152 @@ app.delete('/api/agent/history/:id', authenticateToken, async (req, res) => {
 });
 
 // ============================================================================
+// New Agent API Routes
+// ============================================================================
+
+// GET /api/agent/types - Get available agent types
+app.get('/api/agent/types', (req, res) => {
+  try {
+    if (!agentService) {
+      return res.status(503).json({ error: 'Agent service not ready' });
+    }
+
+    const types = agentService.getAgentTypes();
+    res.json({ types });
+  } catch (error) {
+    console.error('Agent types error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// GET /api/agent/types/:id - Get specific agent type details
+app.get('/api/agent/types/:id', (req, res) => {
+  try {
+    if (!agentService) {
+      return res.status(503).json({ error: 'Agent service not ready' });
+    }
+
+    const agentType = agentService.getAgentTypeById(req.params.id);
+    if (!agentType) {
+      return res.status(404).json({ error: 'Agent type not found' });
+    }
+
+    res.json(agentType);
+  } catch (error) {
+    console.error('Agent type fetch error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// GET /api/agent/suggestions - Get context-aware suggestions
+app.get('/api/agent/suggestions', async (req, res) => {
+  try {
+    if (!agentService) {
+      return res.status(503).json({ error: 'Agent service not ready' });
+    }
+
+    const { file } = req.query;
+    const suggestions = await agentService.getSuggestions(file);
+    res.json({ suggestions });
+  } catch (error) {
+    console.error('Agent suggestions error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// POST /api/agent/chat - Chat-style agent execution
+app.post('/api/agent/chat', async (req, res) => {
+  try {
+    const { message, contextFiles, agentType, conversationId } = req.body;
+
+    if (!message || typeof message !== 'string') {
+      return res.status(400).json({ error: 'Message is required' });
+    }
+
+    if (!agentService) {
+      return res.status(503).json({ error: 'Agent service not ready' });
+    }
+
+    const result = await agentService.executeChat(message, {
+      contextFiles: contextFiles || [],
+      agentType: agentType || 'general',
+      conversationId
+    });
+
+    res.json(result);
+  } catch (error) {
+    console.error('Agent chat error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// GET /api/agent/conversations - Get all conversations with messages
+app.get('/api/agent/conversations', async (req, res) => {
+  try {
+    if (!agentService) {
+      return res.status(503).json({ error: 'Agent service not ready' });
+    }
+
+    const conversations = await agentService.getConversationsWithMessages();
+    res.json({ conversations });
+  } catch (error) {
+    console.error('Agent conversations error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// POST /api/agent/conversations - Create new conversation
+app.post('/api/agent/conversations', async (req, res) => {
+  try {
+    const { userId, agentType, title, firstMessage } = req.body;
+
+    if (!agentService) {
+      return res.status(503).json({ error: 'Agent service not ready' });
+    }
+
+    const conversation = await agentService.createConversation(userId, agentType, title, firstMessage);
+    res.json({ conversation });
+  } catch (error) {
+    console.error('Agent create conversation error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// GET /api/agent/conversations/:id - Get single conversation with messages
+app.get('/api/agent/conversations/:id', async (req, res) => {
+  try {
+    if (!agentService) {
+      return res.status(503).json({ error: 'Agent service not ready' });
+    }
+
+    const conversation = await agentService.getConversationWithMessages(req.params.id);
+    if (!conversation) {
+      return res.status(404).json({ error: 'Conversation not found' });
+    }
+
+    res.json(conversation);
+  } catch (error) {
+    console.error('Agent conversation fetch error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// DELETE /api/agent/conversations/:id - Delete conversation
+app.delete('/api/agent/conversations/:id', authenticateToken, async (req, res) => {
+  try {
+    if (!agentService) {
+      return res.status(503).json({ error: 'Agent service not ready' });
+    }
+
+    await agentService.deleteConversation(req.params.id);
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Agent conversation delete error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ============================================================================
 // File CRUD Routes (General wildcard routes - MUST be after specific routes)
 // ============================================================================
 

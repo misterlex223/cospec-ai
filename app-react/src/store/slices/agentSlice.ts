@@ -1,15 +1,26 @@
 /**
  * Agent Redux Slice
  *
- * Manages agent execution state, history, and statistics
+ * Manages agent execution state, history, statistics, and conversations
  */
 
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import type { PayloadAction } from '@reduxjs/toolkit';
 import axios from 'axios';
 import type { AgentExecution, AgentStats, AgentState } from '../../types/agent';
+import type { AgentType, AgentSuggestion, Conversation, ChatMessage } from '../../services/api';
 
-const initialState: AgentState = {
+// Extended state for chat functionality
+export interface ExtendedAgentState extends AgentState {
+  agentTypes: AgentType[];
+  currentSuggestions: AgentSuggestion[];
+  conversations: Conversation[];
+  currentConversation: Conversation | null;
+  chatMessages: ChatMessage[];
+  isStreamingChat: boolean;
+}
+
+const initialState: ExtendedAgentState = {
   executions: [],
   currentExecution: null,
   stats: null,
@@ -17,6 +28,13 @@ const initialState: AgentState = {
   filter: {},
   isLoading: false,
   errorMessage: null,
+  // New state
+  agentTypes: [],
+  currentSuggestions: [],
+  conversations: [],
+  currentConversation: null,
+  chatMessages: [],
+  isStreamingChat: false,
 };
 
 // Async thunks
@@ -55,6 +73,56 @@ export const deleteAgentExecution = createAsyncThunk(
   }
 );
 
+// New async thunks for chat functionality
+export const fetchAgentTypes = createAsyncThunk(
+  'agent/fetchTypes',
+  async () => {
+    const response = await axios.get('/api/agent/types');
+    return response.data.types as AgentType[];
+  }
+);
+
+export const fetchAgentSuggestions = createAsyncThunk(
+  'agent/fetchSuggestions',
+  async (filePath?: string) => {
+    const params = filePath ? { file: filePath } : {};
+    const response = await axios.get('/api/agent/suggestions', { params });
+    return response.data.suggestions as AgentSuggestion[];
+  }
+);
+
+export const sendAgentChat = createAsyncThunk(
+  'agent/sendChat',
+  async (params: { message: string; contextFiles?: string[]; agentType?: string; conversationId?: string }) => {
+    const response = await axios.post('/api/agent/chat', params);
+    return response.data;
+  }
+);
+
+export const fetchConversations = createAsyncThunk(
+  'agent/fetchConversations',
+  async () => {
+    const response = await axios.get('/api/agent/conversations');
+    return response.data.conversations as Conversation[];
+  }
+);
+
+export const deleteConversation = createAsyncThunk(
+  'agent/deleteConversation',
+  async (id: string) => {
+    await axios.delete(`/api/agent/conversations/${id}`);
+    return id;
+  }
+);
+
+export const createConversation = createAsyncThunk(
+  'agent/createConversation',
+  async (params: { userId?: string; agentType?: string; title?: string; firstMessage?: string }) => {
+    const response = await axios.post('/api/agent/conversations', params);
+    return response.data;
+  }
+);
+
 const agentSlice = createSlice({
   name: 'agent',
   initialState,
@@ -68,7 +136,7 @@ const agentSlice = createSlice({
     closePanel: (state) => {
       state.isPanelOpen = false;
     },
-    setFilter: (state, action: PayloadAction<Partial<AgentState['filter']>>) => {
+    setFilter: (state, action: PayloadAction<Partial<ExtendedAgentState['filter']>>) => {
       state.filter = { ...state.filter, ...action.payload };
     },
     clearFilter: (state) => {
@@ -90,6 +158,29 @@ const agentSlice = createSlice({
     setCurrentExecution: (state, action: PayloadAction<AgentExecution | null>) => {
       state.currentExecution = action.payload;
     },
+    // New reducers for chat functionality
+    setAgentTypes: (state, action: PayloadAction<AgentType[]>) => {
+      state.agentTypes = action.payload;
+    },
+    setSuggestions: (state, action: PayloadAction<AgentSuggestion[]>) => {
+      state.currentSuggestions = action.payload;
+    },
+    setCurrentConversation: (state, action: PayloadAction<Conversation | null>) => {
+      state.currentConversation = action.payload;
+      state.chatMessages = action.payload?.messages || [];
+    },
+    addChatMessage: (state, action: PayloadAction<ChatMessage>) => {
+      state.chatMessages.push(action.payload);
+    },
+    appendToLastMessage: (state, action: PayloadAction<string>) => {
+      const lastMessage = state.chatMessages[state.chatMessages.length - 1];
+      if (lastMessage && lastMessage.role === 'assistant') {
+        lastMessage.content += action.payload;
+      }
+    },
+    setStreamingChat: (state, action: PayloadAction<boolean>) => {
+      state.isStreamingChat = action.payload;
+    },
   },
   extraReducers: (builder) => {
     // Fetch history
@@ -108,13 +199,23 @@ const agentSlice = createSlice({
         state.errorMessage = action.error.message || 'Failed to fetch history';
       });
 
+    // Fetch single execution
+    builder
+      .addCase(fetchAgentExecution.fulfilled, (state, action) => {
+        const idx = state.executions.findIndex(e => e.id === action.payload.id);
+        if (idx !== -1) {
+          state.executions[idx] = action.payload;
+        }
+        state.currentExecution = action.payload;
+      });
+
     // Execute agent
     builder
       .addCase(executeAgent.pending, (state) => {
         state.isLoading = true;
         state.errorMessage = null;
       })
-      .addCase(executeAgent.fulfilled, (state, action) => {
+      .addCase(executeAgent.fulfilled, (state) => {
         state.isLoading = false;
         // Execution will be added via WebSocket event
       })
@@ -128,6 +229,57 @@ const agentSlice = createSlice({
       .addCase(deleteAgentExecution.fulfilled, (state, action) => {
         state.executions = state.executions.filter(e => e.id !== action.payload);
       });
+
+    // Fetch agent types
+    builder
+      .addCase(fetchAgentTypes.fulfilled, (state, action) => {
+        state.agentTypes = action.payload;
+      });
+
+    // Fetch suggestions
+    builder
+      .addCase(fetchAgentSuggestions.fulfilled, (state, action) => {
+        state.currentSuggestions = action.payload;
+      });
+
+    // Send chat
+    builder
+      .addCase(sendAgentChat.pending, (state) => {
+        state.isStreamingChat = true;
+        state.errorMessage = null;
+      })
+      .addCase(sendAgentChat.fulfilled, (state) => {
+        state.isStreamingChat = false;
+      })
+      .addCase(sendAgentChat.rejected, (state, action) => {
+        state.isStreamingChat = false;
+        state.errorMessage = action.error.message || 'Failed to send chat message';
+      });
+
+    // Fetch conversations
+    builder
+      .addCase(fetchConversations.fulfilled, (state, action) => {
+        state.conversations = action.payload;
+      });
+
+    // Delete conversation
+    builder
+      .addCase(deleteConversation.fulfilled, (state, action) => {
+        state.conversations = state.conversations.filter(c => c.id !== action.payload);
+        if (state.currentConversation?.id === action.payload) {
+          state.currentConversation = null;
+          state.chatMessages = [];
+        }
+      });
+
+    // Create conversation
+    builder
+      .addCase(createConversation.fulfilled, (state, action) => {
+        const newConversation = action.payload;
+        state.conversations.unshift(newConversation);
+        state.currentConversation = newConversation;
+        state.chatMessages = newConversation.messages || [];
+      });
   },
 });
 
@@ -140,6 +292,13 @@ export const {
   addExecution,
   updateExecution,
   setCurrentExecution,
+  setAgentTypes,
+  setSuggestions,
+  setCurrentConversation,
+  addChatMessage,
+  appendToLastMessage,
+  setStreamingChat,
+  createConversation,
 } = agentSlice.actions;
 
 export default agentSlice.reducer;

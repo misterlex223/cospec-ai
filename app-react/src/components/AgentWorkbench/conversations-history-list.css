@@ -1,0 +1,254 @@
+/**
+ * Combined Conversations and History List Styles
+ */
+
+.conversations-history-list {
+  padding: 1rem;
+}
+
+.conversations-history-list .history-list-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem 1.5rem;
+  margin-bottom: 1rem;
+}
+
+.list-type-filters {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.type-filter {
+  padding: 0.5rem 1rem;
+  border: 1px solid #e5e7eb;
+  border-radius: 0.375rem;
+  background: white;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-weight: 500;
+}
+
+.type-filter:hover {
+  border-color: #3b82f6;
+  background: #f9fafb;
+}
+
+.type-filter.active {
+  border-color: #3b82f6;
+  background: #eff6ff;
+  color: #1f2937;
+}
+
+.history-empty {
+  text-align: center;
+  padding: 3rem 1rem;
+}
+
+.history-empty > svg,
+.history-empty > p {
+  color: #64748b;
+  margin-bottom: 0.5rem;
+}
+
+.history-empty > p {
+  margin: 0;
+}
+
+.history-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.history-item {
+  background: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 0.5rem;
+  padding: 1rem;
+  transition: all 0.2s ease;
+}
+
+.history-item:hover {
+  border-color: #3b82f6;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+.history-item-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 0.75rem;
+}
+
+.history-item-title {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.agent-type-badge {
+  padding: 0.25rem 0.75rem;
+  border-radius: 0.25rem;
+  font-size: 0.75rem;
+  font-weight: 500;
+  text-transform: uppercase;
+}
+
+.agent-type-badge.general {
+  background: #3b82f6;
+  color: white;
+}
+
+.agent-type-badge.code-reviewer {
+  background: #92400e;
+  color: white;
+}
+
+.agent-type-badge.doc-generator {
+  background: #d97706;
+  color: white;
+}
+
+.execution-time {
+  font-size: 0.875rem;
+  color: #6b7280;
+  font-weight: 400;
+}
+
+.history-item-actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.action-btn {
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  padding: 0.5rem;
+  border-radius: 0.375rem;
+  transition: all 0.2s ease;
+  color: #64748b;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.action-btn:hover {
+  background: #f3f4f6;
+  color: #1f2937;
+}
+
+.action-btn.delete-btn:hover {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.history-item-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+}
+
+.execution-files {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.375rem;
+}
+
+.file-tag {
+  background: #f3f4f6;
+  color: #1f2937;
+  padding: 0.25rem 0.5rem;
+  border-radius: 0.25rem;
+  font-size: 0.875rem;
+  font-family: 'Courier New', monospace;
+}
+
+.execution-summary {
+  padding: 0.75rem;
+  background: white;
+  border-radius: 0.375rem;
+  font-size: 0.875rem;
+  color: #1f2937;
+  line-height: 1.4;
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.execution-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.5rem 1rem;
+  border-radius: 0.375rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+
+.execution-status .status-badge {
+  padding: 0.25rem 0.75rem;
+  border-radius: 0.25rem;
+  font-size: 0.875rem;
+}
+
+.execution-status .status-badge.running {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.execution-status .status-badge.success {
+  background: #d1fae5;
+  color: #065f46;
+}
+
+.execution-status .status-badge.failed {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+/* Conversation-specific styles */
+.conversation-item {
+  border-left: 3px solid #3b82f6;
+}
+
+.conversation-item .history-item-header {
+  padding-left: 0;
+}
+
+.conversation-preview {
+  font-style: italic;
+  color: #6b7280;
+}
+
+.conversation-files {
+  margin-top: 0.5rem;
+}
+
+.conversation-item .current-conversation-info {
+  background: #eff6ff;
+  padding: 0.5rem 1rem;
+  border-radius: 0.375rem;
+  margin-bottom: 0.75rem;
+}
+
+.current-conversation-label {
+  font-size: 0.75rem;
+  color: #6b7280;
+  margin-bottom: 0.25rem;
+}
+
+.current-conversation-name {
+  font-weight: 600;
+  color: #1f2937;
+}
+
+/* Loading state */
+.history-loading,
+.conversations-loading {
+  text-align: center;
+  padding: 2rem;
+  color: #64748b;
+  font-size: 0.9375rem;
+}

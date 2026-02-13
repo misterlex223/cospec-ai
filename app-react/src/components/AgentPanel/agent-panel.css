@@ -20,6 +20,44 @@
   border-bottom: 1px solid #e5e7eb;
 }
 
+.agent-panel-header-right {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+/* Mode switcher buttons */
+.mode-switch {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  border-radius: 0.375rem;
+  border: 1px solid transparent;
+  background: transparent;
+  color: #64748b;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-weight: 500;
+}
+
+.mode-switch:hover {
+  background: #f3f4f6;
+  color: #1f2937;
+}
+
+.mode-switch.active {
+  background: #3b82f6;
+  color: white;
+  border-color: #3b82f6;
+}
+
+.mode-switch svg {
+  width: 18px;
+  height: 18px;
+}
+
 .agent-panel-header h3 {
   margin: 0;
   font-size: 1.125rem;
@@ -204,6 +242,71 @@
   border-bottom: 1px solid #e5e7eb;
 }
 
+/* Return button for chat mode */
+.agent-prompt-return-btn {
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
+  background: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 0.375rem;
+  padding: 0.5rem 1rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  z-index: 2001;
+  transition: all 0.15s ease;
+}
+
+.agent-prompt-return-btn:hover {
+  background: #f9fafb;
+  border-color: #3b82f6;
+}
+
+.agent-prompt-return-btn svg {
+  width: 16px;
+  height: 16px;
+  color: #64748b;
+}
+
+/* Return button for chat mode */
+.agent-prompt-return-btn {
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
+  background: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 0.375rem;
+  padding: 0.5rem 1rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  z-index: 2001;
+  transition: all 0.15s ease;
+}
+
+.agent-prompt-return-btn:hover {
+  background: #f9fafb;
+  border-color: #3b82f6;
+}
+
+.agent-prompt-return-btn svg {
+  width: 16px;
+  height: 16px;
+  color: #64748b;
+}
+
+.agent-prompt-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1rem 1.5rem;
+  background: white;
+  border-bottom: 1px solid #e5e7eb;
+}
+
 .agent-prompt-header h3 {
   margin: 0;
   font-size: 1.125rem;
@@ -233,6 +336,52 @@
   display: flex;
   align-items: center;
   gap: 0.5rem;
+}
+
+/* ============================================================
+ * Chat Mode Section
+ * ============================================================
+ */
+
+.agent-panel-chat-section {
+  padding: 1rem;
+  background: #fafafa;
+  border-top: 1px solid #e5e7eb;
+  flex: 1;
+}
+
+.current-conversation-info {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1rem;
+  background: white;
+  border-radius: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.conversation-label {
+  font-weight: 500;
+  color: #6b7280;
+  font-size: 0.875rem;
+}
+
+.conversation-name {
+  font-weight: 600;
+  color: #1f2937;
+  font-size: 1rem;
+}
+
+.mode-actions-chat {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.mode-actions-execution {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
 }
 
 .agent-prompt-context .context-file {
