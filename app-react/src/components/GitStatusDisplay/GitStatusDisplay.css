@@ -1,0 +1,57 @@
+/**
+ * GitStatusDisplay Styles
+ */
+
+.git-status-display {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  background: var(--bg-tertiary, #2d2d2d);
+  border-radius: 4px;
+  font-size: 12px;
+}
+
+.git-status-loading {
+  color: var(--text-secondary, #a0a0a0);
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+.git-status-clean {
+  color: #4caf50;
+  font-size: 14px;
+}
+
+.git-status-badge {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 6px;
+  border-radius: 3px;
+  font-size: 11px;
+  font-weight: 500;
+}
+
+.git-status-badge.modified {
+  background: rgba(255, 152, 0, 0.2);
+  color: #ff9800;
+}
+
+.git-status-badge.added {
+  background: rgba(76, 175, 80, 0.2);
+  color: #4caf50;
+}
+
+.git-status-badge.untracked {
+  background: rgba(158, 158, 158, 0.2);
+  color: #9e9e9e;
+}

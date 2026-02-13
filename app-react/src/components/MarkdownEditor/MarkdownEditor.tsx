@@ -8,6 +8,7 @@ import { cn } from '../../lib/utils';
 import { RequirementsView } from '../RequirementsView/RequirementsView';
 import { SystemDesignView } from '../SystemDesignView/SystemDesignView';
 import GitPanel from '../GitPanel';
+import GitStatusDisplay from '../GitStatusDisplay';
 import './MarkdownEditorStyles.css';
 
 // 簡單的防抖函數實現
@@ -369,6 +370,7 @@ export function MarkdownEditor({ filePath, className }: MarkdownEditorProps) {
           <span className="mr-2">📄</span> {/* 檔案圖標 */}
           {fileName}
         </h2>
+        <GitStatusDisplay />
       </div>
 
       {/* 編輯器容器 - 確保工具欄可見 */}
