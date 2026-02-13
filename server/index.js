@@ -9,6 +9,9 @@ const chokidar = require('chokidar');
 const http = require('http');
 const { Server } = require('socket.io');
 const serveStatic = require('serve-static');
+const rateLimit = require('express-rate-limit');
+const helmet = require('helmet');
+
 // 引入 glob-gitignore 用於處理 .gitignore 過濾
 let globGitignore;
 try {
@@ -17,134 +20,105 @@ try {
   console.warn('glob-gitignore not available, falling back to standard glob');
 }
 
+// Services
+const AgentService = require('./agentService');
+const GitService = require('./services/gitService');
+const AgentDB = require('./agentDb');
+const fileSyncManager = require('./fileSyncManager');
+const kaiContextClient = require('./kaiContextClient');
+const profileManager = require('./profileManager');
+
+// ============================================================================
+// Configuration & Initialization
+// ============================================================================
+
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server, {
-  cors: {
-    origin: "*",
-    methods: ["GET", "POST"]
-  }
+  cors: { origin: "*", methods: ["GET", "POST"] }
 });
+
 const PORT = process.env.PORT || 9280;
-
-// Set up static file serving for the frontend build
-// Serve static files from the 'dist' directory (where the React app will be built)
-// In the containerized environment, this will be under app-react/dist
-const distPath = path.join(__dirname, '..', 'app-react', 'dist');
-
-// Check if dist directory exists synchronously
-try {
-  const stats = require('fs').statSync(distPath);
-  if (stats.isDirectory()) {
-    app.use(serveStatic(distPath));
-  } else {
-    console.warn('Warning: Frontend build directory not found at', distPath);
-    console.warn('Run `npm run build` in the app-react directory to build the frontend');
-  }
-} catch (err) {
-  console.warn('Warning: Frontend build directory not found at', distPath);
-  console.warn('Run `npm run build` in the app-react directory to build the frontend');
-}
-
-// For local development, also check the root dist directory
-const rootDistPath = path.join(__dirname, '..', 'dist');
-if (!require('fs').existsSync(distPath)) {
-  try {
-    const stats = require('fs').statSync(rootDistPath);
-    if (stats.isDirectory()) {
-      app.use(serveStatic(rootDistPath));
-      console.log('Using root dist directory for static files');
-    }
-  } catch (err) {
-    console.warn('Root dist directory also not found at', rootDistPath);
-  }
-}
-
-// Note: The WebSocket server is handled by Socket.IO, so we don't need the manual WebSocket handler
-// Socket.IO automatically sets up WebSocket connections on the same server port
-
-// 向所有 Socket.io 客戶端發送消息
-function broadcastToClients(message) {
-  io.emit('file-change', message);
-}
-
-// 功能項目: 1.1.3 設定環境變數
-// Use relative path for development, absolute path for Docker
 const MARKDOWN_DIR = process.env.MARKDOWN_DIR || path.join(__dirname, '..', 'markdown');
+const MAX_CONTENT_SIZE = 10 * 1024 * 1024; // 10MB
 
-const rateLimit = require('express-rate-limit');
-const helmet = require('helmet');
-
-// Agent Service
-const AgentService = require('./agentService');
 // Git Service
-const GitService = require('./services/gitService');
 const gitService = new GitService(path.join(__dirname, '..', 'markdown'));
 console.log('✓ Git service ready');
-const AgentDB = require('./agentDb');
 
-// Initialize Agent DB and Service
+// Agent DB and Service
 const agentDb = new AgentDB(path.join(__dirname, '..', 'agent-history.db'));
 let agentService;
 
-// Initialize Agent DB on startup
 agentDb.initialize()
   .then(() => {
     console.log('✓ Agent database initialized');
     agentService = new AgentService(io, agentDb);
     console.log('✓ Agent service ready');
   })
-  .catch(err => {
-    console.error('✗ Failed to initialize agent database:', err);
-  });
+  .catch(err => console.error('✗ Failed to initialize agent database:', err));
 
-// 安全性中間件
-app.use(helmet()); // 添加多種安全頭部
+// ============================================================================
+// Static File Serving
+// ============================================================================
+
+const distPath = path.join(__dirname, '..', 'app-react', 'dist');
+const rootDistPath = path.join(__dirname, '..', 'dist');
+
+function setupStaticFiles() {
+  const fsSync = require('fs');
+
+  // Try app-react/dist first
+  try {
+    if (fsSync.statSync(distPath).isDirectory()) {
+      app.use(serveStatic(distPath));
+      return;
+    }
+  } catch {}
+
+  // Fall back to root dist
+  try {
+    if (fsSync.statSync(rootDistPath).isDirectory()) {
+      app.use(serveStatic(rootDistPath));
+      console.log('Using root dist directory for static files');
+      return;
+    }
+  } catch {}
+
+  console.warn('Warning: Frontend build directory not found');
+  console.warn('Run `npm run build` in the app-react directory to build the frontend');
+}
+
+setupStaticFiles();
+
+// ============================================================================
+// Middleware
+// ============================================================================
+
+app.use(helmet());
 app.use(cors());
-app.use(express.json({ limit: '10mb' }));  // 限制請求體大小
+app.use(express.json({ limit: '10mb' }));
 app.use(morgan('dev'));
 
-// 路由限制
 const limiter = rateLimit({
-  windowMs: 1 * 60 * 1000, // 1 minutes
-  max: 100, // limit each IP to 60 requests per windowMs
+  windowMs: 1 * 60 * 1000,
+  max: 100,
   message: 'Too many requests from this IP, please try again later.'
 });
 app.use('/api/', limiter);
 
-// 簡單的身份驗證中間件（演示用途，生產環境應使用更安全的方法）
-function authenticateToken(req, res, next) {
-  // 在實際應用中，您應該實現真正的 JWT 或會話驗證
-  // 這裡僅作為示例
-  const authHeader = req.headers['authorization'];
+// ============================================================================
+// Utility Functions
+// ============================================================================
 
-  // 簡單的密鑰驗證（僅用於演示）
-  const validApiKey = process.env.API_KEY || 'demo-api-key';
-
-  if (!authHeader) {
-    return res.status(401).json({ error: 'Access denied. No token provided.' });
-  }
-
-  // 檢查格式: "Bearer <token>" 或直接是密鑰
-  const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7, authHeader.length) : authHeader;
-
-  if (token !== validApiKey) {
-    return res.status(403).json({ error: 'Invalid token.' });
-  }
-
-  next();
+function broadcastToClients(message) {
+  io.emit('file-change', message);
 }
 
-
-
-// 輸入驗證和路徑清理函數
 function sanitizePath(inputPath) {
-  // 解碼 URI 組件
   try {
     const decodedPath = decodeURIComponent(inputPath);
-    // 清理路徑，防止目錄遍歷
     const normalizedPath = path.normalize(decodedPath);
-    // 確保路徑不以 .. 開頭或包含 ../ 模式
     if (normalizedPath.includes('../') || normalizedPath.startsWith('..')) {
       throw new Error('Invalid path: directory traversal detected');
     }
@@ -154,33 +128,112 @@ function sanitizePath(inputPath) {
   }
 }
 
-// 功能項目: 2.1.3 監控文件變更
-let watcher;
+function validateMarkdownPath(filePath) {
+  if (!filePath.toLowerCase().endsWith('.md')) {
+    throw new Error('Only markdown files are allowed');
+  }
+}
 
-// 添加文件緩存
-let fileCache = {
-  files: [],           // 文件列表緩存
-  lastUpdated: 0,      // 上次更新時間
-  isValid: false,      // 緩存是否有效
-  isInitialized: false // 是否已初始化
+function resolveSafePath(sanitizedPath) {
+  const filePath = path.join(MARKDOWN_DIR, sanitizedPath);
+  const resolvedPath = path.resolve(filePath);
+  const resolvedMarkdownDir = path.resolve(MARKDOWN_DIR);
+
+  if (!resolvedPath.startsWith(resolvedMarkdownDir)) {
+    throw new Error('Invalid file path: outside allowed directory');
+  }
+
+  return filePath;
+}
+
+async function ensureFileExists(filePath) {
+  try {
+    await fs.access(filePath);
+  } catch (error) {
+    throw new Error(`File not found: ${path.basename(filePath)}`);
+  }
+}
+
+async function ensureFileDoesNotExist(filePath) {
+  try {
+    await fs.access(filePath);
+    throw new Error(`File already exists: ${path.basename(filePath)}`);
+  } catch (error) {
+    if (error.message.includes('already exists')) throw error;
+    // File doesn't exist, which is what we want
+  }
+}
+
+function validateContent(content) {
+  if (typeof content !== 'string') {
+    throw new Error('Content must be a string');
+  }
+  if (Buffer.byteLength(content, 'utf8') > MAX_CONTENT_SIZE) {
+    throw new Error('Content too large');
+  }
+}
+
+// Async wrapper for route handlers
+const asyncHandler = (fn) => (req, res, next) => {
+  Promise.resolve(fn(req, res, next)).catch(next);
 };
 
-// 重置緩存狀態
+// Service readiness checkers
+const checkAgentService = (req, res, next) => {
+  if (!agentService) return res.status(503).json({ error: 'Agent service not ready' });
+  next();
+};
+
+const checkAgentDb = (req, res, next) => {
+  if (!agentDb) return res.status(503).json({ error: 'Agent database not ready' });
+  next();
+};
+
+// ============================================================================
+// Authentication
+// ============================================================================
+
+function authenticateToken(req, res, next) {
+  const authHeader = req.headers['authorization'];
+  const validApiKey = process.env.API_KEY || 'demo-api-key';
+
+  if (!authHeader) {
+    return res.status(401).json({ error: 'Access denied. No token provided.' });
+  }
+
+  const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : authHeader;
+
+  if (token !== validApiKey) {
+    return res.status(403).json({ error: 'Invalid token.' });
+  }
+
+  next();
+}
+
+// ============================================================================
+// File Cache
+// ============================================================================
+
+const fileCache = {
+  files: [],
+  lastUpdated: 0,
+  isValid: false,
+  isInitialized: false
+};
+
 const invalidateCache = () => {
   fileCache.isValid = false;
   console.log('File cache invalidated');
 };
 
-// 獲取文件列表，優先使用緩存
 const getFileList = async () => {
-  // 如果緩存有效，直接返回
   if (fileCache.isValid && fileCache.files.length > 0) {
     console.log('Using cached file list');
     return fileCache.files;
   }
 
   console.log('Cache invalid, scanning directory...');
-  // 緩存無效，重新掃描目錄
+
   try {
     const gitignorePath = path.join(MARKDOWN_DIR, '.gitignore');
     let hasGitignore = false;
@@ -189,19 +242,17 @@ const getFileList = async () => {
     try {
       await fs.access(gitignorePath);
       hasGitignore = true;
-    } catch (error) {
+    } catch {
       console.log('No .gitignore file found for file list');
     }
 
-    // 使用 glob-gitignore 如果可用且有 .gitignore 文件
+    // Use glob-gitignore if available
     if (globGitignore && hasGitignore) {
       try {
         files = await globGitignore.glob('**/*.md', {
           cwd: MARKDOWN_DIR,
           absolute: true,
-          gitignore: {
-            path: gitignorePath
-          },
+          gitignore: { path: gitignorePath },
           ignore: ['**/node_modules/**']
         });
       } catch (err) {
@@ -215,52 +266,26 @@ const getFileList = async () => {
         ignore: [`${MARKDOWN_DIR}/**/node_modules/**`]
       });
 
-      // 如果有 .gitignore 文件但沒有 glob-gitignore，手動過濾
+      // Manual .gitignore filtering if needed
       if (hasGitignore) {
         const gitignoreContent = await fs.readFile(gitignorePath, 'utf-8');
-        const gitignorePatterns = gitignoreContent
+        const patterns = gitignoreContent
           .split('\n')
           .filter(line => line.trim() && !line.startsWith('#'))
-          .map(pattern => pattern.trim());
+          .map(p => p.trim());
 
         files = files.filter(file => {
           const relativePath = path.relative(MARKDOWN_DIR, file);
-
-          for (const pattern of gitignorePatterns) {
-            if (pattern.endsWith('/')) {
-              if (relativePath.startsWith(pattern) || relativePath.includes('/' + pattern)) {
-                return false;
-              }
-            } else if (pattern.includes('*')) {
-              const regexPattern = pattern
-                .replace(/\./g, '\\.')
-                .replace(/\*/g, '.*');
-              const regex = new RegExp(`^${regexPattern}$`);
-              if (regex.test(relativePath) || regex.test(path.basename(relativePath))) {
-                return false;
-              }
-            } else {
-              if (relativePath === pattern || relativePath.endsWith('/' + pattern) || path.basename(relativePath) === pattern) {
-                return false;
-              }
-            }
-          }
-
-          return true;
+          return !patterns.some(pattern => matchesGitignorePattern(relativePath, pattern));
         });
       }
     }
 
-    // 將絕對路徑轉換為相對路徑
-    const relativePaths = files.map(file => {
-      const relativePath = path.relative(MARKDOWN_DIR, file);
-      return {
-        path: relativePath,
-        name: path.basename(file)
-      };
-    });
+    const relativePaths = files.map(file => ({
+      path: path.relative(MARKDOWN_DIR, file),
+      name: path.basename(file)
+    }));
 
-    // 更新緩存
     fileCache.files = relativePaths;
     fileCache.lastUpdated = Date.now();
     fileCache.isValid = true;
@@ -273,12 +298,51 @@ const getFileList = async () => {
     throw error;
   }
 };
-const setupWatcher = async () => {
-  if (watcher) {
-    watcher.close();
-  }
 
-  // 檢查是否有 .gitignore 文件
+function matchesGitignorePattern(relativePath, pattern) {
+  if (pattern.endsWith('/')) {
+    return relativePath.startsWith(pattern) || relativePath.includes('/' + pattern);
+  }
+  if (pattern.includes('*')) {
+    const regexPattern = pattern.replace(/\./g, '\\.').replace(/\*/g, '.*');
+    const regex = new RegExp(`^${regexPattern}$`);
+    return regex.test(relativePath) || regex.test(path.basename(relativePath));
+  }
+  return relativePath === pattern || relativePath.endsWith('/' + pattern) || path.basename(relativePath) === pattern;
+}
+
+// ============================================================================
+// File Watcher
+// ============================================================================
+
+let watcher;
+
+async function handleFileEvent(filePath, eventType) {
+  const relativePath = path.relative(MARKDOWN_DIR, filePath);
+
+  if (eventType !== 'unlink') {
+    try {
+      if (relativePath.endsWith('.md')) {
+        const content = await fs.readFile(filePath, 'utf-8');
+        fileSyncManager.handleFileChange(relativePath, content);
+      }
+    } catch (error) {
+      console.error('[ContextSync] Error on file event:', error);
+    }
+  } else {
+    try {
+      if (relativePath.endsWith('.md')) {
+        fileSyncManager.handleFileDelete(relativePath);
+      }
+    } catch (error) {
+      console.error('[ContextSync] Error on file delete:', error);
+    }
+  }
+}
+
+async function setupWatcher() {
+  if (watcher) watcher.close();
+
   const gitignorePath = path.join(MARKDOWN_DIR, '.gitignore');
   let hasGitignore = false;
   let gitignoreContent = '';
@@ -288,275 +352,223 @@ const setupWatcher = async () => {
     gitignoreContent = await fs.readFile(gitignorePath, 'utf-8');
     hasGitignore = true;
     console.log(`Found .gitignore for watcher at ${gitignorePath}`);
-  } catch (error) {
+  } catch {
     console.log('No .gitignore file found for watcher');
   }
 
   const watchOptions = {
     persistent: true,
     ignored: [
-      /(^|[\/\\])\../, // 忽略隱藏文件
-      '**/node_modules/**', // 忽略 node_modules 目錄
-      '**/.cospec-sync/**' // 忽略 CoSpec 同步元數據目錄
+      /(^|[\/\\])\../,
+      '**/node_modules/**',
+      '**/.cospec-sync/**'
     ]
   };
 
-  // 如果有 .gitignore 文件，添加到忽略列表
   if (hasGitignore) {
-    // 將 .gitignore 檔案內容轉換為 chokidar 可用的忽略模式
     const gitignorePatterns = gitignoreContent
       .split('\n')
       .filter(line => line.trim() && !line.startsWith('#'))
-      .map(pattern => {
-        // 確保模式是相對於 MARKDOWN_DIR 的
-        return pattern.startsWith('/') ? pattern.substring(1) : pattern;
-      });
-
-    // 將模式添加到忽略列表
-    watchOptions.ignored = [...watchOptions.ignored, ...gitignorePatterns.map(p => `${MARKDOWN_DIR}/${p}`)];
+      .map(p => p.startsWith('/') ? p.substring(1) : p);
+    watchOptions.ignored.push(...gitignorePatterns.map(p => `${MARKDOWN_DIR}/${p}`));
   }
 
   watcher = chokidar.watch(`${MARKDOWN_DIR}/**/*.md`, watchOptions);
+  console.log(`Watching for changes in ${MARKDOWN_DIR}`);
 
-  console.log(`Watching for changes in ${MARKDOWN_DIR} with options:`, watchOptions);
-
-  // 監聽文件變更並更新緩存，同時透過 WebSocket 通知客戶端
   watcher
     .on('add', async (filePath) => {
       console.log(`File ${filePath} has been added`);
-      invalidateCache(); // 文件添加時使緩存失效
-
+      invalidateCache();
       const relativePath = path.relative(MARKDOWN_DIR, filePath);
-
-      // 向所有客戶端發送文件更新通知
-      broadcastToClients({
-        type: 'FILE_ADDED',
-        path: relativePath,
-        timestamp: Date.now()
-      });
-
-      // Context sync integration
-      try {
-        if (relativePath.endsWith('.md')) {
-          const content = await fs.readFile(filePath, 'utf-8');
-          fileSyncManager.handleFileChange(relativePath, content);
-        }
-      } catch (error) {
-        console.error('[ContextSync] Error on file add:', error);
-      }
+      broadcastToClients({ type: 'FILE_ADDED', path: relativePath, timestamp: Date.now() });
+      await handleFileEvent(filePath, 'add');
     })
     .on('change', async (filePath) => {
       console.log(`File ${filePath} has been changed`);
-      // 文件內容變更不需要使緩存失效，因為文件列表沒變
-
       const relativePath = path.relative(MARKDOWN_DIR, filePath);
-
-      // 向所有客戶端發送文件更新通知
-      broadcastToClients({
-        type: 'FILE_CHANGED',
-        path: relativePath,
-        timestamp: Date.now()
-      });
-
-      // Context sync integration
-      try {
-        if (relativePath.endsWith('.md')) {
-          const content = await fs.readFile(filePath, 'utf-8');
-          fileSyncManager.handleFileChange(relativePath, content);
-        }
-      } catch (error) {
-        console.error('[ContextSync] Error on file change:', error);
-      }
+      broadcastToClients({ type: 'FILE_CHANGED', path: relativePath, timestamp: Date.now() });
+      await handleFileEvent(filePath, 'change');
     })
-    .on('unlink', (filePath) => {
+    .on('unlink', async (filePath) => {
       console.log(`File ${filePath} has been removed`);
-      invalidateCache(); // 文件刪除時使緩存失效
-
+      invalidateCache();
       const relativePath = path.relative(MARKDOWN_DIR, filePath);
-
-      // 向所有客戶端發送文件更新通知
-      broadcastToClients({
-        type: 'FILE_DELETED',
-        path: relativePath,
-        timestamp: Date.now()
-      });
-
-      // Context sync integration
-      try {
-        if (relativePath.endsWith('.md')) {
-          fileSyncManager.handleFileDelete(relativePath);
-        }
-      } catch (error) {
-        console.error('[ContextSync] Error on file delete:', error);
-      }
+      broadcastToClients({ type: 'FILE_DELETED', path: relativePath, timestamp: Date.now() });
+      await handleFileEvent(filePath, 'unlink');
     });
 
-  // 初始化緩存
   try {
     await getFileList();
     console.log('Initial file cache built');
   } catch (err) {
     console.error('Error building initial file cache:', err);
   }
-};
-
-// 功能項目: 2.1.1 遞迴掃描指定目錄下所有 Markdown 文件
-app.get('/api/files', async (req, res) => {
-  try {
-    // 檢查目錄是否存在
-    try {
-      await fs.access(MARKDOWN_DIR);
-    } catch (error) {
-      return res.status(404).json({ error: `Markdown directory not found: ${MARKDOWN_DIR}` });
-    }
-
-    // 使用緩存機制獲取文件列表
-    let files = await getFileList();
-
-    // Annotate files with profile metadata if profile is loaded
-    if (profileManager.isLoaded()) {
-      files = await profileManager.annotateFiles(files, MARKDOWN_DIR);
-    }
-
-    res.json(files);
-  } catch (error) {
-    console.error('Error fetching files:', error);
-    res.status(500).json({ error: error.message });
-  }
-});
-
-// 添加緩存控制端點
-app.post('/api/files/refresh', authenticateToken, async (req, res) => {
-  try {
-    invalidateCache();
-    const files = await getFileList();
-    res.json({ success: true, fileCount: files.length });
-  } catch (error) {
-    console.error('Error refreshing file cache:', error);
-    res.status(500).json({ error: error.message });
-  }
-});
-
-// 功能項目: 2.2.1 讀取文件內容
-app.get('/api/files/:path(*)', async (req, res) => {
-  try {
-    // 驗證並清理路徑
-    const sanitizedPath = sanitizePath(req.params.path);
-
-    // 確保路徑是 markdown 文件
-    if (!sanitizedPath.toLowerCase().endsWith('.md')) {
-      return res.status(400).json({ error: 'Only markdown files are allowed' });
-    }
-
-    const filePath = path.join(MARKDOWN_DIR, sanitizedPath);
-
-    // 確保路徑在 MARKDOWN_DIR 內
-    const resolvedPath = path.resolve(filePath);
-    const resolvedMarkdownDir = path.resolve(MARKDOWN_DIR);
-    if (!resolvedPath.startsWith(resolvedMarkdownDir)) {
-      return res.status(400).json({ error: 'Invalid file path: outside allowed directory' });
-    }
-
-    try {
-      await fs.access(filePath);
-    } catch (error) {
-      return res.status(404).json({ error: `File not found: ${sanitizedPath}` });
-    }
-
-    const content = await fs.readFile(filePath, 'utf-8');
-    res.json({ path: sanitizedPath, content });
-  } catch (error) {
-    console.error('Error reading file:', error);
-    res.status(500).json({ error: error.message });
-  }
-});
+}
 
 // ============================================================================
-// Context System Integration Routes (MUST be before wildcard routes)
+// File API Routes
 // ============================================================================
 
-const fileSyncManager = require('./fileSyncManager');
-const kaiContextClient = require('./kaiContextClient');
-const profileManager = require('./profileManager');
-
-// POST /api/files/:path/sync-to-context - Manually mark file for sync
-app.post('/api/files/:path(*)/sync-to-context', authenticateToken, async (req, res) => {
+// GET /api/files - List all markdown files
+app.get('/api/files', asyncHandler(async (req, res) => {
   try {
-    console.log('[ContextSync] Received sync request for path:', req.params.path);
-    const filePath = sanitizePath(req.params.path);
-    console.log('[ContextSync] Sanitized path:', filePath);
-    const fullPath = path.join(MARKDOWN_DIR, filePath);
-    console.log('[ContextSync] Full path:', fullPath);
-
-    // Check if file exists
-    try {
-      await fs.access(fullPath);
-    } catch (error) {
-      console.error('[ContextSync] File not found:', fullPath);
-      return res.status(404).json({ error: `File not found: ${filePath}` });
-    }
-
-    // Read file content
-    const content = await fs.readFile(fullPath, 'utf-8');
-    console.log('[ContextSync] File content length:', content.length);
-
-    // Sync to context
-    const result = await fileSyncManager.markForSync(filePath, content);
-    console.log('[ContextSync] Sync result:', result);
-
-    res.json(result);
-  } catch (error) {
-    console.error('[ContextSync] Failed to mark file for sync:', error);
-    res.status(500).json({ error: error.message });
+    await fs.access(MARKDOWN_DIR);
+  } catch {
+    return res.status(404).json({ error: `Markdown directory not found: ${MARKDOWN_DIR}` });
   }
-});
 
-// DELETE /api/files/:path/sync-to-context - Unmark file from sync
-app.delete('/api/files/:path(*)/sync-to-context', authenticateToken, async (req, res) => {
-  try {
-    const filePath = sanitizePath(req.params.path);
-    const result = await fileSyncManager.unmarkFromSync(filePath);
-    res.json(result);
-  } catch (error) {
-    console.error('[ContextSync] Failed to unmark file from sync:', error);
-    res.status(500).json({ error: error.message });
-  }
-});
+  let files = await getFileList();
 
-// GET /api/files/:path/sync-status - Get sync status
-app.get('/api/files/:path(*)/sync-status', async (req, res) => {
-  try {
-    const filePath = sanitizePath(req.params.path);
-    const status = fileSyncManager.getSyncStatus(filePath);
-    res.json(status);
-  } catch (error) {
-    console.error('[ContextSync] Failed to get sync status:', error);
-    res.status(500).json({ error: error.message });
+  if (profileManager.isLoaded()) {
+    files = await profileManager.annotateFiles(files, MARKDOWN_DIR);
   }
-});
 
-// GET /api/context-config - Get context configuration
-app.get('/api/context-config', async (req, res) => {
-  try {
-    const healthy = await kaiContextClient.healthCheck();
-    res.json({
-      enabled: kaiContextClient.enabled,
-      healthy,
-      projectId: kaiContextClient.projectId,
-      patterns: fileSyncManager.getPatterns(),
-      syncedFiles: fileSyncManager.getAllSyncedFiles(),
-    });
-  } catch (error) {
-    console.error('[ContextSync] Failed to get config:', error);
-    res.status(500).json({ error: error.message });
+  res.json(files);
+}));
+
+// POST /api/files/refresh - Refresh file cache
+app.post('/api/files/refresh', authenticateToken, asyncHandler(async (req, res) => {
+  invalidateCache();
+  const files = await getFileList();
+  res.json({ success: true, fileCount: files.length });
+}));
+
+// GET /api/files/:path(*) - Read file content
+app.get('/api/files/:path(*)', asyncHandler(async (req, res) => {
+  const sanitizedPath = sanitizePath(req.params.path);
+  validateMarkdownPath(sanitizedPath);
+  const filePath = resolveSafePath(sanitizedPath);
+  await ensureFileExists(filePath);
+
+  const content = await fs.readFile(filePath, 'utf-8');
+  res.json({ path: sanitizedPath, content });
+}));
+
+// POST /api/files/:path(*) - Save file content
+app.post('/api/files/:path(*)', authenticateToken, asyncHandler(async (req, res) => {
+  const { content } = req.body;
+
+  if (content === undefined) {
+    return res.status(400).json({ error: 'Content is required' });
   }
-});
+
+  validateContent(content);
+
+  const sanitizedPath = sanitizePath(req.params.path);
+  validateMarkdownPath(sanitizedPath);
+  const filePath = resolveSafePath(sanitizedPath);
+
+  await fs.mkdir(path.dirname(filePath), { recursive: true });
+  await fs.writeFile(filePath, content, 'utf-8');
+
+  res.json({ success: true, path: sanitizedPath });
+}));
+
+// PUT /api/files/:path(*) - Create new file
+app.put('/api/files/:path(*)', authenticateToken, asyncHandler(async (req, res) => {
+  const { content = '' } = req.body;
+
+  validateContent(content);
+
+  const sanitizedPath = sanitizePath(req.params.path);
+  validateMarkdownPath(sanitizedPath);
+  const filePath = resolveSafePath(sanitizedPath);
+
+  await ensureFileDoesNotExist(filePath);
+  await fs.mkdir(path.dirname(filePath), { recursive: true });
+  await fs.writeFile(filePath, content, 'utf-8');
+
+  res.status(201).json({ success: true, path: sanitizedPath });
+}));
+
+// DELETE /api/files/:path(*) - Delete file
+app.delete('/api/files/:path(*)', authenticateToken, asyncHandler(async (req, res) => {
+  const sanitizedPath = sanitizePath(req.params.path);
+  validateMarkdownPath(sanitizedPath);
+  const filePath = resolveSafePath(sanitizedPath);
+
+  await ensureFileExists(filePath);
+  await fs.unlink(filePath);
+
+  res.json({ success: true, path: sanitizedPath });
+}));
+
+// PATCH /api/files/:path(*) - Rename file
+app.patch('/api/files/:path(*)', authenticateToken, asyncHandler(async (req, res) => {
+  const { newPath } = req.body;
+
+  if (!newPath) {
+    return res.status(400).json({ error: 'New path is required' });
+  }
+
+  const sanitizedOldPath = sanitizePath(req.params.path);
+  const sanitizedNewPath = sanitizePath(newPath);
+
+  validateMarkdownPath(sanitizedOldPath);
+  validateMarkdownPath(sanitizedNewPath);
+
+  const oldPath = resolveSafePath(sanitizedOldPath);
+  const targetPath = resolveSafePath(sanitizedNewPath);
+
+  // Verify both paths are safe (resolveSafePath only checks one)
+  const resolvedMarkdownDir = path.resolve(MARKDOWN_DIR);
+  if (!path.resolve(targetPath).startsWith(resolvedMarkdownDir)) {
+    return res.status(400).json({ error: 'Invalid file path: outside allowed directory' });
+  }
+
+  await ensureFileExists(oldPath);
+  await ensureFileDoesNotExist(targetPath);
+
+  await fs.mkdir(path.dirname(targetPath), { recursive: true });
+  await fs.rename(oldPath, targetPath);
+
+  res.json({ success: true, oldPath: sanitizedOldPath, newPath: sanitizedNewPath });
+}));
 
 // ============================================================================
-// Configuration API Routes
+// Context Sync Routes
 // ============================================================================
 
-// GET /api/config - Get application configuration
+app.post('/api/files/:path(*)/sync-to-context', authenticateToken, asyncHandler(async (req, res) => {
+  const filePath = sanitizePath(req.params.path);
+  const fullPath = path.join(MARKDOWN_DIR, filePath);
+
+  await ensureFileExists(fullPath);
+
+  const content = await fs.readFile(fullPath, 'utf-8');
+  const result = await fileSyncManager.markForSync(filePath, content);
+
+  res.json(result);
+}));
+
+app.delete('/api/files/:path(*)/sync-to-context', authenticateToken, asyncHandler(async (req, res) => {
+  const filePath = sanitizePath(req.params.path);
+  const result = await fileSyncManager.unmarkFromSync(filePath);
+  res.json(result);
+}));
+
+app.get('/api/files/:path(*)/sync-status', asyncHandler(async (req, res) => {
+  const filePath = sanitizePath(req.params.path);
+  const status = fileSyncManager.getSyncStatus(filePath);
+  res.json(status);
+}));
+
+app.get('/api/context-config', asyncHandler(async (req, res) => {
+  const healthy = await kaiContextClient.healthCheck();
+  res.json({
+    enabled: kaiContextClient.enabled,
+    healthy,
+    projectId: kaiContextClient.projectId,
+    patterns: fileSyncManager.getPatterns(),
+    syncedFiles: fileSyncManager.getAllSyncedFiles(),
+  });
+}));
+
+// ============================================================================
+// Configuration API
+// ============================================================================
+
 app.get('/api/config', (req, res) => {
   res.json({
     profileEditorMode: process.env.PROFILE_EDITOR_MODE === 'true',
@@ -568,904 +580,432 @@ app.get('/api/config', (req, res) => {
 // Profile API Routes
 // ============================================================================
 
-// GET /api/profile - Get loaded profile configuration
-app.get('/api/profile', async (req, res) => {
-  try {
-    if (!profileManager.isLoaded()) {
-      return res.json({ profile: null });
-    }
-
-    const profile = profileManager.getProfile();
-    res.json({
-      profile,
-      profileName: profileManager.getProfileName(),
-      profilePath: profileManager.getProfilePath(),
-    });
-  } catch (error) {
-    console.error('Failed to get profile:', error);
-    res.status(500).json({ error: error.message });
+app.get('/api/profile', asyncHandler(async (req, res) => {
+  if (!profileManager.isLoaded()) {
+    return res.json({ profile: null });
   }
-});
 
-// GET /api/profile/files - Get required files with existence status
-app.get('/api/profile/files', async (req, res) => {
-  try {
-    if (!profileManager.isLoaded()) {
-      return res.json({ files: [] });
-    }
+  res.json({
+    profile: profileManager.getProfile(),
+    profileName: profileManager.getProfileName(),
+    profilePath: profileManager.getProfilePath(),
+  });
+}));
 
-    const files = await getFileList();
-    const annotatedFiles = await profileManager.annotateFiles(files, MARKDOWN_DIR);
-
-    // Filter to only required files
-    const requiredFiles = annotatedFiles.filter(f => f.profileMetadata?.required);
-
-    res.json({ files: requiredFiles });
-  } catch (error) {
-    console.error('Failed to get profile files:', error);
-    res.status(500).json({ error: error.message });
+app.get('/api/profile/files', asyncHandler(async (req, res) => {
+  if (!profileManager.isLoaded()) {
+    return res.json({ files: [] });
   }
-});
 
-// GET /api/profile/prompt/:path(*) - Get prompt file content
-app.get('/api/profile/prompt/:path(*)', async (req, res) => {
-  try {
-    if (!profileManager.isLoaded()) {
-      return res.status(404).json({ error: 'No profile loaded' });
-    }
+  const files = await getFileList();
+  const annotatedFiles = await profileManager.annotateFiles(files, MARKDOWN_DIR);
+  const requiredFiles = annotatedFiles.filter(f => f.profileMetadata?.required);
 
-    const filePath = sanitizePath(req.params.path);
-    const doc = profileManager.getDocumentByPath(filePath);
+  res.json({ files: requiredFiles });
+}));
 
-    if (!doc || !doc.promptFile) {
-      return res.status(404).json({ error: 'Prompt file not found for document' });
-    }
-
-    const promptFilePath = profileManager.resolvePromptFile(doc.promptFile);
-
-    try {
-      const content = await fs.readFile(promptFilePath, 'utf-8');
-      res.json({
-        path: doc.promptFile,
-        absolutePath: promptFilePath,
-        content,
-      });
-    } catch (err) {
-      return res.status(404).json({ error: `Prompt file not found: ${doc.promptFile}` });
-    }
-  } catch (error) {
-    console.error('Failed to get prompt content:', error);
-    res.status(500).json({ error: error.message });
+app.get('/api/profile/prompt/:path(*)', asyncHandler(async (req, res) => {
+  if (!profileManager.isLoaded()) {
+    return res.status(404).json({ error: 'No profile loaded' });
   }
-});
 
-// POST /api/profile/generate/:path(*) - Generate file using profile command
-app.post('/api/profile/generate/:path(*)', authenticateToken, async (req, res) => {
-  try {
-    if (!profileManager.isLoaded()) {
-      return res.status(404).json({ error: 'No profile loaded' });
-    }
+  const filePath = sanitizePath(req.params.path);
+  const doc = profileManager.getDocumentByPath(filePath);
 
-    const filePath = sanitizePath(req.params.path);
-    const context = profileManager.getGenerationContext(filePath);
-
-    if (!context.command) {
-      return res.status(400).json({ error: 'No generation command defined for this document' });
-    }
-
-    const targetPath = path.join(MARKDOWN_DIR, filePath);
-    const targetDir = path.dirname(targetPath);
-
-    // Ensure target directory exists
-    await fs.mkdir(targetDir, { recursive: true });
-
-    // Build command with variable substitution
-    let command = context.command
-      .replace(/{filePath}/g, targetPath)
-      .replace(/{promptText}/g, context.promptText || '');
-
-    if (context.promptFile) {
-      command = command.replace(/{promptFile}/g, context.promptFile);
-    }
-
-    console.log(`[ProfileGen] Executing command for ${filePath}:`, command);
-
-    // Execute command
-    const { spawn } = require('child_process');
-    const child = spawn(command, [], {
-      shell: true,
-      cwd: MARKDOWN_DIR,
-    });
-
-    const outputBuffer = [];
-
-    child.stdout.on('data', (data) => {
-      const output = data.toString();
-      outputBuffer.push(output);
-      io.emit('generation-output', { path: filePath, output, isError: false });
-    });
-
-    child.stderr.on('data', (data) => {
-      const output = data.toString();
-      outputBuffer.push(output);
-      io.emit('generation-output', { path: filePath, output, isError: true });
-    });
-
-    child.on('close', async (code) => {
-      const success = code === 0;
-      console.log(`[ProfileGen] Command finished with code ${code} for ${filePath}`);
-
-      io.emit('generation-complete', {
-        path: filePath,
-        success,
-        output: outputBuffer.join(''),
-        exitCode: code,
-      });
-
-      if (success) {
-        // Invalidate cache and notify clients
-        invalidateCache();
-        broadcastToClients({
-          type: 'file-added',
-          path: filePath,
-        });
-      }
-    });
-
-    child.on('error', (err) => {
-      console.error(`[ProfileGen] Command error for ${filePath}:`, err);
-      io.emit('generation-complete', {
-        path: filePath,
-        success: false,
-        error: err.message,
-      });
-    });
-
-    res.json({ success: true, message: 'Generation started' });
-  } catch (error) {
-    console.error('Failed to generate file:', error);
-    res.status(500).json({ error: error.message });
+  if (!doc || !doc.promptFile) {
+    return res.status(404).json({ error: 'Prompt file not found for document' });
   }
-});
 
-// GET /api/profile/validate - Validate profile configuration
-app.get('/api/profile/validate', async (req, res) => {
+  const promptFilePath = profileManager.resolvePromptFile(doc.promptFile);
+
   try {
-    if (!profileManager.isLoaded()) {
-      return res.status(404).json({ error: 'No profile loaded' });
-    }
-
-    const profile = profileManager.getProfile();
-    const validation = await profileManager.validateProfile(profile);
-
-    res.json(validation);
-  } catch (error) {
-    console.error('Failed to validate profile:', error);
-    res.status(500).json({
-      valid: false,
-      errors: [error.message],
-      warnings: [],
-    });
+    const content = await fs.readFile(promptFilePath, 'utf-8');
+    res.json({ path: doc.promptFile, absolutePath: promptFilePath, content });
+  } catch (err) {
+    return res.status(404).json({ error: `Prompt file not found: ${doc.promptFile}` });
   }
-});
+}));
+
+app.post('/api/profile/generate/:path(*)', authenticateToken, asyncHandler(async (req, res) => {
+  if (!profileManager.isLoaded()) {
+    return res.status(404).json({ error: 'No profile loaded' });
+  }
+
+  const filePath = sanitizePath(req.params.path);
+  const context = profileManager.getGenerationContext(filePath);
+
+  if (!context.command) {
+    return res.status(400).json({ error: 'No generation command defined for this document' });
+  }
+
+  const targetPath = path.join(MARKDOWN_DIR, filePath);
+  await fs.mkdir(path.dirname(targetPath), { recursive: true });
+
+  let command = context.command
+    .replace(/{filePath}/g, targetPath)
+    .replace(/{promptText}/g, context.promptText || '');
+
+  if (context.promptFile) {
+    command = command.replace(/{promptFile}/g, context.promptFile);
+  }
+
+  console.log(`[ProfileGen] Executing command for ${filePath}:`, command);
+
+  const { spawn } = require('child_process');
+  const child = spawn(command, [], { shell: true, cwd: MARKDOWN_DIR });
+  const outputBuffer = [];
+
+  child.stdout.on('data', (data) => {
+    const output = data.toString();
+    outputBuffer.push(output);
+    io.emit('generation-output', { path: filePath, output, isError: false });
+  });
+
+  child.stderr.on('data', (data) => {
+    const output = data.toString();
+    outputBuffer.push(output);
+    io.emit('generation-output', { path: filePath, output, isError: true });
+  });
+
+  child.on('close', async (code) => {
+    const success = code === 0;
+    console.log(`[ProfileGen] Command finished with code ${code} for ${filePath}`);
+
+    io.emit('generation-complete', {
+      path: filePath,
+      success,
+      output: outputBuffer.join(''),
+      exitCode: code,
+    });
+
+    if (success) {
+      invalidateCache();
+      broadcastToClients({ type: 'file-added', path: filePath });
+    }
+  });
+
+  child.on('error', (err) => {
+    console.error(`[ProfileGen] Command error for ${filePath}:`, err);
+    io.emit('generation-complete', {
+      path: filePath,
+      success: false,
+      error: err.message,
+    });
+  });
+
+  res.json({ success: true, message: 'Generation started' });
+}));
+
+app.get('/api/profile/validate', asyncHandler(async (req, res) => {
+  if (!profileManager.isLoaded()) {
+    return res.status(404).json({ error: 'No profile loaded' });
+  }
+
+  const profile = profileManager.getProfile();
+  const validation = await profileManager.validateProfile(profile);
+  res.json(validation);
+}));
 
 // ============================================================================
-// Profile Management API Routes (for Profile Editor)
+// Profile Management Routes
 // ============================================================================
 
-// GET /api/profiles - List all available profiles
-app.get('/api/profiles', async (req, res) => {
-  try {
-    const profiles = await profileManager.listAvailableProfiles();
-    res.json({ profiles });
-  } catch (error) {
-    console.error('Failed to list profiles:', error);
-    res.status(500).json({ error: error.message });
+app.get('/api/profiles', asyncHandler(async (req, res) => {
+  const profiles = await profileManager.listAvailableProfiles();
+  res.json({ profiles });
+}));
+
+app.get('/api/profiles/:name', asyncHandler(async (req, res) => {
+  const profileName = req.params.name;
+  const profile = await profileManager.getProfileContent(profileName);
+  res.json({ profile, profileName });
+}));
+
+app.post('/api/profiles', authenticateToken, asyncHandler(async (req, res) => {
+  const { name, config } = req.body;
+
+  if (!name || !config) {
+    return res.status(400).json({ error: 'Name and config are required' });
   }
-});
 
-// GET /api/profiles/:name - Get specific profile content without loading
-app.get('/api/profiles/:name', async (req, res) => {
-  try {
-    const profileName = req.params.name;
-    const profile = await profileManager.getProfileContent(profileName);
-    res.json({ profile, profileName });
-  } catch (error) {
-    console.error(`Failed to get profile ${req.params.name}:`, error);
-    res.status(500).json({ error: error.message });
+  const profile = await profileManager.createProfile(name, config);
+  res.json({ success: true, profile, profileName: name });
+}));
+
+app.put('/api/profiles/:name', authenticateToken, asyncHandler(async (req, res) => {
+  const profileName = req.params.name;
+  const { config } = req.body;
+
+  if (!config) {
+    return res.status(400).json({ error: 'Config is required' });
   }
-});
 
-// POST /api/profiles - Create new profile
-app.post('/api/profiles', authenticateToken, async (req, res) => {
-  try {
-    const { name, config } = req.body;
+  const profile = await profileManager.updateProfile(profileName, config);
+  res.json({ success: true, profile, profileName });
+}));
 
-    if (!name || !config) {
-      return res.status(400).json({ error: 'Name and config are required' });
-    }
+app.delete('/api/profiles/:name', authenticateToken, asyncHandler(async (req, res) => {
+  const profileName = req.params.name;
+  await profileManager.deleteProfile(profileName);
+  res.json({ success: true, profileName });
+}));
 
-    const profile = await profileManager.createProfile(name, config);
-    res.json({ success: true, profile, profileName: name });
-  } catch (error) {
-    console.error('Failed to create profile:', error);
-    res.status(500).json({ error: error.message });
+app.post('/api/profiles/:name/load', authenticateToken, asyncHandler(async (req, res) => {
+  const profileName = req.params.name;
+  const profile = await profileManager.reloadProfile(profileName);
+
+  invalidateCache();
+
+  io.emit('profile-reloaded', { profileName, profile });
+
+  res.json({
+    success: true,
+    profile,
+    profileName,
+    profilePath: profileManager.getProfilePath(),
+  });
+}));
+
+app.post('/api/profiles/:name/prompts', authenticateToken, asyncHandler(async (req, res) => {
+  const profileName = req.params.name;
+  const { path: promptPath, content } = req.body;
+
+  if (!promptPath || content === undefined) {
+    return res.status(400).json({ error: 'Path and content are required' });
   }
-});
 
-// PUT /api/profiles/:name - Update existing profile
-app.put('/api/profiles/:name', authenticateToken, async (req, res) => {
-  try {
-    const profileName = req.params.name;
-    const { config } = req.body;
+  await profileManager.savePromptFile(profileName, promptPath, content);
+  res.json({ success: true, path: promptPath });
+}));
 
-    if (!config) {
-      return res.status(400).json({ error: 'Config is required' });
-    }
+app.delete('/api/profiles/:name/prompts', authenticateToken, asyncHandler(async (req, res) => {
+  const profileName = req.params.name;
+  const { path: promptPath } = req.body;
 
-    const profile = await profileManager.updateProfile(profileName, config);
-    res.json({ success: true, profile, profileName });
-  } catch (error) {
-    console.error(`Failed to update profile ${req.params.name}:`, error);
-    res.status(500).json({ error: error.message });
+  if (!promptPath) {
+    return res.status(400).json({ error: 'Path is required' });
   }
-});
 
-// DELETE /api/profiles/:name - Delete profile
-app.delete('/api/profiles/:name', authenticateToken, async (req, res) => {
-  try {
-    const profileName = req.params.name;
-    await profileManager.deleteProfile(profileName);
-    res.json({ success: true, profileName });
-  } catch (error) {
-    console.error(`Failed to delete profile ${req.params.name}:`, error);
-    res.status(500).json({ error: error.message });
-  }
-});
+  await profileManager.deletePromptFile(profileName, promptPath);
+  res.json({ success: true, path: promptPath });
+}));
 
-// POST /api/profiles/:name/load - Hot reload/switch to profile
-app.post('/api/profiles/:name/load', authenticateToken, async (req, res) => {
-  try {
-    const profileName = req.params.name;
-    const profile = await profileManager.reloadProfile(profileName);
+app.get('/api/profiles/:name/prompts/:path(*)', asyncHandler(async (req, res) => {
+  const profileName = req.params.name;
+  const promptPath = req.params.path;
 
-    // Invalidate file cache to refresh with new profile metadata
-    invalidateCache();
-
-    // Broadcast profile reload event to all clients
-    io.emit('profile-reloaded', {
-      profileName,
-      profile,
-    });
-
-    res.json({
-      success: true,
-      profile,
-      profileName,
-      profilePath: profileManager.getProfilePath(),
-    });
-  } catch (error) {
-    console.error(`Failed to load profile ${req.params.name}:`, error);
-    res.status(500).json({ error: error.message });
-  }
-});
-
-// POST /api/profiles/:name/prompts - Create/update prompt file
-app.post('/api/profiles/:name/prompts', authenticateToken, async (req, res) => {
-  try {
-    const profileName = req.params.name;
-    const { path: promptPath, content } = req.body;
-
-    if (!promptPath || content === undefined) {
-      return res.status(400).json({ error: 'Path and content are required' });
-    }
-
-    await profileManager.savePromptFile(profileName, promptPath, content);
-    res.json({ success: true, path: promptPath });
-  } catch (error) {
-    console.error('Failed to save prompt file:', error);
-    res.status(500).json({ error: error.message });
-  }
-});
-
-// DELETE /api/profiles/:name/prompts - Delete prompt file
-app.delete('/api/profiles/:name/prompts', authenticateToken, async (req, res) => {
-  try {
-    const profileName = req.params.name;
-    const { path: promptPath } = req.body;
-
-    if (!promptPath) {
-      return res.status(400).json({ error: 'Path is required' });
-    }
-
-    await profileManager.deletePromptFile(profileName, promptPath);
-    res.json({ success: true, path: promptPath });
-  } catch (error) {
-    console.error('Failed to delete prompt file:', error);
-    res.status(500).json({ error: error.message });
-  }
-});
-
-// GET /api/profiles/:name/prompts/:path(*) - Get prompt file content
-app.get('/api/profiles/:name/prompts/:path(*)', async (req, res) => {
-  try {
-    const profileName = req.params.name;
-    const promptPath = req.params.path;
-
-    const content = await profileManager.readPromptFile(profileName, promptPath);
-    res.json({ content, path: promptPath });
-  } catch (error) {
-    console.error('Failed to read prompt file:', error);
-    res.status(500).json({ error: error.message });
-  }
-});
+  const content = await profileManager.readPromptFile(profileName, promptPath);
+  res.json({ content, path: promptPath });
+}));
 
 // ============================================================================
 // Agent API Routes
 // ============================================================================
 
-// POST /api/agent/execute - Execute agent
-app.post('/api/agent/execute', authenticateToken, async (req, res) => {
-  try {
-    const { agentType, targetFiles, customPrompt, outputPath } = req.body;
+const VALID_AGENT_TYPES = ['prd-analyzer', 'code-reviewer', 'doc-generator', 'version-advisor'];
 
-    if (!agentType || !targetFiles || !Array.isArray(targetFiles)) {
-      return res.status(400).json({
-        error: 'Missing required fields: agentType, targetFiles'
-      });
-    }
+app.post('/api/agent/execute', authenticateToken, checkAgentService, asyncHandler(async (req, res) => {
+  const { agentType, targetFiles, customPrompt, outputPath } = req.body;
 
-    const validTypes = ['prd-analyzer', 'code-reviewer', 'doc-generator', 'version-advisor'];
-    if (!validTypes.includes(agentType)) {
-      return res.status(400).json({
-        error: `Invalid agentType. Must be one of: ${validTypes.join(', ')}`
-      });
-    }
-
-    if (!agentService) {
-      return res.status(503).json({ error: 'Agent service not ready' });
-    }
-
-    const result = await agentService.executeAgent(agentType, targetFiles, {
-      customPrompt,
-      outputPath
-    });
-
-    res.json(result);
-  } catch (error) {
-    console.error('Agent execution error:', error);
-    res.status(500).json({ error: error.message });
+  if (!agentType || !targetFiles || !Array.isArray(targetFiles)) {
+    return res.status(400).json({ error: 'Missing required fields: agentType, targetFiles' });
   }
+
+  if (!VALID_AGENT_TYPES.includes(agentType)) {
+    return res.status(400).json({ error: `Invalid agentType. Must be one of: ${VALID_AGENT_TYPES.join(', ')}` });
+  }
+
+  const result = await agentService.executeAgent(agentType, targetFiles, { customPrompt, outputPath });
+  res.json(result);
+}));
+
+app.get('/api/agent/history', checkAgentDb, asyncHandler(async (req, res) => {
+  const { limit = 20, offset = 0, agentType, status } = req.query;
+
+  const executions = await agentDb.findAll({
+    limit: parseInt(limit),
+    offset: parseInt(offset),
+    agentType,
+    status
+  });
+
+  const stats = await agentDb.getStats();
+
+  res.json({ executions, total: executions.length, stats });
+}));
+
+app.get('/api/agent/history/:id', checkAgentDb, asyncHandler(async (req, res) => {
+  const execution = await agentDb.findById(req.params.id);
+
+  if (!execution) {
+    return res.status(404).json({ error: 'Execution not found' });
+  }
+
+  res.json(execution);
+}));
+
+app.delete('/api/agent/history/:id', authenticateToken, checkAgentDb, asyncHandler(async (req, res) => {
+  await agentDb.delete(req.params.id);
+  res.json({ success: true });
+}));
+
+app.get('/api/agent/types', checkAgentService, (req, res) => {
+  const types = agentService.getAgentTypes();
+  res.json({ types });
 });
 
-// GET /api/agent/history - Get agent execution history
-app.get('/api/agent/history', async (req, res) => {
-  try {
-    const { limit = 20, offset = 0, agentType, status } = req.query;
+app.get('/api/agent/types/:id', checkAgentService, (req, res) => {
+  const agentType = agentService.getAgentTypeById(req.params.id);
 
-    if (!agentDb) {
-      return res.status(503).json({ error: 'Agent database not ready' });
-    }
-
-    const executions = await agentDb.findAll({
-      limit: parseInt(limit),
-      offset: parseInt(offset),
-      agentType,
-      status
-    });
-
-    const stats = await agentDb.getStats();
-
-    res.json({
-      executions,
-      total: executions.length,
-      stats
-    });
-  } catch (error) {
-    console.error('Agent history error:', error);
-    res.status(500).json({ error: error.message });
+  if (!agentType) {
+    return res.status(404).json({ error: 'Agent type not found' });
   }
+
+  res.json(agentType);
 });
 
-// GET /api/agent/history/:id - Get single execution
-app.get('/api/agent/history/:id', async (req, res) => {
-  try {
-    if (!agentDb) {
-      return res.status(503).json({ error: 'Agent database not ready' });
-    }
+app.get('/api/agent/suggestions', checkAgentService, asyncHandler(async (req, res) => {
+  const { file } = req.query;
+  const suggestions = await agentService.getSuggestions(file);
+  res.json({ suggestions });
+}));
 
-    const execution = await agentDb.findById(req.params.id);
+app.post('/api/agent/chat', checkAgentService, asyncHandler(async (req, res) => {
+  const { message, contextFiles, agentType, conversationId } = req.body;
 
-    if (!execution) {
-      return res.status(404).json({ error: 'Execution not found' });
-    }
-
-    res.json(execution);
-  } catch (error) {
-    console.error('Agent fetch error:', error);
-    res.status(500).json({ error: error.message });
+  if (!message || typeof message !== 'string') {
+    return res.status(400).json({ error: 'Message is required' });
   }
-});
 
-// DELETE /api/agent/history/:id - Delete execution
-app.delete('/api/agent/history/:id', authenticateToken, async (req, res) => {
-  try {
-    if (!agentDb) {
-      return res.status(503).json({ error: 'Agent database not ready' });
-    }
+  const result = await agentService.executeChat(message, {
+    contextFiles: contextFiles || [],
+    agentType: agentType || 'general',
+    conversationId
+  });
 
-    await agentDb.delete(req.params.id);
-    res.json({ success: true });
-  } catch (error) {
-    console.error('Agent delete error:', error);
-    res.status(500).json({ error: error.message });
+  res.json(result);
+}));
+
+app.get('/api/agent/conversations', checkAgentService, asyncHandler(async (req, res) => {
+  const conversations = await agentService.getConversationsWithMessages();
+  res.json({ conversations });
+}));
+
+app.post('/api/agent/conversations', checkAgentService, asyncHandler(async (req, res) => {
+  const { userId, agentType, title, firstMessage } = req.body;
+  const conversation = await agentService.createConversation(userId, agentType, title, firstMessage);
+  res.json({ conversation });
+}));
+
+app.get('/api/agent/conversations/:id', checkAgentService, asyncHandler(async (req, res) => {
+  const conversation = await agentService.getConversationWithMessages(req.params.id);
+
+  if (!conversation) {
+    return res.status(404).json({ error: 'Conversation not found' });
   }
-});
 
-// ============================================================================
-// New Agent API Routes
-// ============================================================================
+  res.json(conversation);
+}));
 
-// GET /api/agent/types - Get available agent types
-app.get('/api/agent/types', (req, res) => {
-  try {
-    if (!agentService) {
-      return res.status(503).json({ error: 'Agent service not ready' });
-    }
-
-    const types = agentService.getAgentTypes();
-    res.json({ types });
-  } catch (error) {
-    console.error('Agent types error:', error);
-    res.status(500).json({ error: error.message });
-  }
-});
-
-// GET /api/agent/types/:id - Get specific agent type details
-app.get('/api/agent/types/:id', (req, res) => {
-  try {
-    if (!agentService) {
-      return res.status(503).json({ error: 'Agent service not ready' });
-    }
-
-    const agentType = agentService.getAgentTypeById(req.params.id);
-    if (!agentType) {
-      return res.status(404).json({ error: 'Agent type not found' });
-    }
-
-    res.json(agentType);
-  } catch (error) {
-    console.error('Agent type fetch error:', error);
-    res.status(500).json({ error: error.message });
-  }
-});
-
-// GET /api/agent/suggestions - Get context-aware suggestions
-app.get('/api/agent/suggestions', async (req, res) => {
-  try {
-    if (!agentService) {
-      return res.status(503).json({ error: 'Agent service not ready' });
-    }
-
-    const { file } = req.query;
-    const suggestions = await agentService.getSuggestions(file);
-    res.json({ suggestions });
-  } catch (error) {
-    console.error('Agent suggestions error:', error);
-    res.status(500).json({ error: error.message });
-  }
-});
-
-// POST /api/agent/chat - Chat-style agent execution
-app.post('/api/agent/chat', async (req, res) => {
-  try {
-    const { message, contextFiles, agentType, conversationId } = req.body;
-
-    if (!message || typeof message !== 'string') {
-      return res.status(400).json({ error: 'Message is required' });
-    }
-
-    if (!agentService) {
-      return res.status(503).json({ error: 'Agent service not ready' });
-    }
-
-    const result = await agentService.executeChat(message, {
-      contextFiles: contextFiles || [],
-      agentType: agentType || 'general',
-      conversationId
-    });
-
-    res.json(result);
-  } catch (error) {
-    console.error('Agent chat error:', error);
-    res.status(500).json({ error: error.message });
-  }
-});
-
-// GET /api/agent/conversations - Get all conversations with messages
-app.get('/api/agent/conversations', async (req, res) => {
-  try {
-    if (!agentService) {
-      return res.status(503).json({ error: 'Agent service not ready' });
-    }
-
-    const conversations = await agentService.getConversationsWithMessages();
-    res.json({ conversations });
-  } catch (error) {
-    console.error('Agent conversations error:', error);
-    res.status(500).json({ error: error.message });
-  }
-});
-
-// POST /api/agent/conversations - Create new conversation
-app.post('/api/agent/conversations', async (req, res) => {
-  try {
-    const { userId, agentType, title, firstMessage } = req.body;
-
-    if (!agentService) {
-      return res.status(503).json({ error: 'Agent service not ready' });
-    }
-
-    const conversation = await agentService.createConversation(userId, agentType, title, firstMessage);
-    res.json({ conversation });
-  } catch (error) {
-    console.error('Agent create conversation error:', error);
-    res.status(500).json({ error: error.message });
-  }
-});
-
-// GET /api/agent/conversations/:id - Get single conversation with messages
-app.get('/api/agent/conversations/:id', async (req, res) => {
-  try {
-    if (!agentService) {
-      return res.status(503).json({ error: 'Agent service not ready' });
-    }
-
-    const conversation = await agentService.getConversationWithMessages(req.params.id);
-    if (!conversation) {
-      return res.status(404).json({ error: 'Conversation not found' });
-    }
-
-    res.json(conversation);
-  } catch (error) {
-    console.error('Agent conversation fetch error:', error);
-    res.status(500).json({ error: error.message });
-  }
-});
-
-// DELETE /api/agent/conversations/:id - Delete conversation
-app.delete('/api/agent/conversations/:id', authenticateToken, async (req, res) => {
-  try {
-    if (!agentService) {
-      return res.status(503).json({ error: 'Agent service not ready' });
-    }
-
-    await agentService.deleteConversation(req.params.id);
-    res.json({ success: true });
-  } catch (error) {
-    console.error('Agent conversation delete error:', error);
-    res.status(500).json({ error: error.message });
-  }
-});
-
-// ============================================================================
+app.delete('/api/agent/conversations/:id', authenticateToken, checkAgentService, asyncHandler(async (req, res) => {
+  await agentService.deleteConversation(req.params.id);
+  res.json({ success: true });
+}));
 
 // ============================================================================
 // Git API Routes
 // ============================================================================
 
-app.get('/api/git/status', async (req, res) => {
-  try {
-    const result = await gitService.getStatus();
-    res.json(result);
-  } catch (error) {
-    console.error('Git status error:', error);
-    res.status(500).json({ error: error.message });
-  }
-});
+app.get('/api/git/status', asyncHandler(async (req, res) => {
+  const result = await gitService.getStatus();
+  res.json(result);
+}));
 
-app.get('/api/git/log', async (req, res) => {
-  try {
-    const limit = parseInt(req.query.limit) || 20;
-    const offset = parseInt(req.query.offset) || 0;
-    const result = await gitService.getLog(limit, offset);
-    res.json(result);
-  } catch (error) {
-    console.error('Git log error:', error);
-    res.status(500).json({ error: error.message });
-  }
-});
+app.get('/api/git/log', asyncHandler(async (req, res) => {
+  const limit = parseInt(req.query.limit) || 20;
+  const offset = parseInt(req.query.offset) || 0;
+  const result = await gitService.getLog(limit, offset);
+  res.json(result);
+}));
 
-app.get('/api/git/commit/:id', async (req, res) => {
-  try {
-    const result = await gitService.getCommit(req.params.id);
-    res.json(result);
-  } catch (error) {
-    console.error('Git commit error:', error);
-    res.status(500).json({ error: error.message });
-  }
-});
+app.get('/api/git/commit/:id', asyncHandler(async (req, res) => {
+  const result = await gitService.getCommit(req.params.id);
+  res.json(result);
+}));
 
-app.get('/api/git/diff', async (req, res) => {
-  try {
-    const { pathA, pathB } = req.query;
-    if (!pathA || !pathB) {
-      return res.status(400).json({ error: 'pathA and pathB are required' });
-    }
-    const result = await gitService.diff(pathA, pathB);
-    res.json(result);
-  } catch (error) {
-    console.error('Git diff error:', error);
-    res.status(500).json({ error: error.message });
-  }
-});
+app.get('/api/git/diff', asyncHandler(async (req, res) => {
+  const { pathA, pathB } = req.query;
 
-app.get('/api/git/branches', async (req, res) => {
-  try {
-    const branches = await gitService.getBranches();
-    res.json({ branches });
-  } catch (error) {
-    console.error('Git branches error:', error);
-    res.status(500).json({ error: error.message });
+  if (!pathA || !pathB) {
+    return res.status(400).json({ error: 'pathA and pathB are required' });
   }
-});
 
-app.post('/api/git/stage', authenticateToken, async (req, res) => {
-  try {
-    const { files } = req.body;
-    if (!Array.isArray(files)) {
-      return res.status(400).json({ error: 'files must be an array' });
-    }
-    const result = await gitService.stageFiles(files);
-    res.json(result);
-  } catch (error) {
-    console.error('Git stage error:', error);
-    res.status(500).json({ error: error.message });
+  const result = await gitService.diff(pathA, pathB);
+  res.json(result);
+}));
+
+app.get('/api/git/branches', asyncHandler(async (req, res) => {
+  const branches = await gitService.getBranches();
+  res.json({ branches });
+}));
+
+app.post('/api/git/stage', authenticateToken, asyncHandler(async (req, res) => {
+  const { files } = req.body;
+
+  if (!Array.isArray(files)) {
+    return res.status(400).json({ error: 'files must be an array' });
   }
-});
 
-app.post('/api/git/commit', authenticateToken, async (req, res) => {
-  try {
-    const { message } = req.body;
-    if (!message) {
-      return res.status(400).json({ error: 'message is required' });
-    }
-    const result = await gitService.commitFiles(message);
-    res.json(result);
-  } catch (error) {
-    console.error('Git commit error:', error);
-    res.status(500).json({ error: error.message });
+  const result = await gitService.stageFiles(files);
+  res.json(result);
+}));
+
+app.post('/api/git/commit', authenticateToken, asyncHandler(async (req, res) => {
+  const { message } = req.body;
+
+  if (!message) {
+    return res.status(400).json({ error: 'message is required' });
   }
-});
 
-// File CRUD Routes (General wildcard routes - MUST be after specific routes)
+  const result = await gitService.commitFiles(message);
+  res.json(result);
+}));
+
+// ============================================================================
+// Catch-all Route
 // ============================================================================
 
-// 功能項目: 2.2.2 保存文件內容
-app.post('/api/files/:path(*)', authenticateToken, async (req, res) => {
-  try {
-    const { content } = req.body;
-    if (content === undefined) {
-      return res.status(400).json({ error: 'Content is required' });
-    }
-
-    // 驗證內容類型
-    if (typeof content !== 'string') {
-      return res.status(400).json({ error: 'Content must be a string' });
-    }
-
-    // 限制內容大小 (例如 10MB)
-    if (Buffer.byteLength(content, 'utf8') > 10 * 1024 * 1024) {
-      return res.status(400).json({ error: 'Content too large' });
-    }
-
-    // 驗證並清理路徑
-    const sanitizedPath = sanitizePath(req.params.path);
-
-    // 確保路徑是 markdown 文件
-    if (!sanitizedPath.toLowerCase().endsWith('.md')) {
-      return res.status(400).json({ error: 'Only markdown files are allowed' });
-    }
-
-    const filePath = path.join(MARKDOWN_DIR, sanitizedPath);
-
-    // 確保路徑在 MARKDOWN_DIR 內
-    const resolvedPath = path.resolve(filePath);
-    const resolvedMarkdownDir = path.resolve(MARKDOWN_DIR);
-    if (!resolvedPath.startsWith(resolvedMarkdownDir)) {
-      return res.status(400).json({ error: 'Invalid file path: outside allowed directory' });
-    }
-
-    // 確保目錄存在
-    const dirPath = path.dirname(filePath);
-    await fs.mkdir(dirPath, { recursive: true });
-
-    await fs.writeFile(filePath, content, 'utf-8');
-    res.json({ success: true, path: sanitizedPath });
-  } catch (error) {
-    console.error('Error saving file:', error);
-    res.status(500).json({ error: error.message });
-  }
-});
-
-// 功能項目: 2.2.3 創建新文件
-app.put('/api/files/:path(*)', authenticateToken, async (req, res) => {
-  try {
-    const { content = '' } = req.body;
-
-    // 驗證內容類型
-    if (typeof content !== 'string') {
-      return res.status(400).json({ error: 'Content must be a string' });
-    }
-
-    // 限制內容大小
-    if (Buffer.byteLength(content, 'utf8') > 10 * 1024 * 1024) {
-      return res.status(400).json({ error: 'Content too large' });
-    }
-
-    // 驗證並清理路徑
-    const sanitizedPath = sanitizePath(req.params.path);
-
-    // 確保路徑是 markdown 文件
-    if (!sanitizedPath.toLowerCase().endsWith('.md')) {
-      return res.status(400).json({ error: 'Only markdown files are allowed' });
-    }
-
-    const filePath = path.join(MARKDOWN_DIR, sanitizedPath);
-
-    // 確保路徑在 MARKDOWN_DIR 內
-    const resolvedPath = path.resolve(filePath);
-    const resolvedMarkdownDir = path.resolve(MARKDOWN_DIR);
-    if (!resolvedPath.startsWith(resolvedMarkdownDir)) {
-      return res.status(400).json({ error: 'Invalid file path: outside allowed directory' });
-    }
-
-    // 檢查文件是否已存在
-    try {
-      await fs.access(filePath);
-      return res.status(409).json({ error: `File already exists: ${sanitizedPath}` });
-    } catch (error) {
-      // 文件不存在，可以創建
-    }
-
-    // 確保目錄存在
-    const dirPath = path.dirname(filePath);
-    await fs.mkdir(dirPath, { recursive: true });
-
-    await fs.writeFile(filePath, content, 'utf-8');
-    res.status(201).json({ success: true, path: sanitizedPath });
-  } catch (error) {
-    console.error('Error creating file:', error);
-    res.status(500).json({ error: error.message });
-  }
-});
-
-// 功能項目: 2.2.4 刪除文件
-app.delete('/api/files/:path(*)', authenticateToken, async (req, res) => {
-  try {
-    // 驗證並清理路徑
-    const sanitizedPath = sanitizePath(req.params.path);
-
-    // 確保路徑是 markdown 文件
-    if (!sanitizedPath.toLowerCase().endsWith('.md')) {
-      return res.status(400).json({ error: 'Only markdown files are allowed' });
-    }
-
-    const filePath = path.join(MARKDOWN_DIR, sanitizedPath);
-
-    // 確保路徑在 MARKDOWN_DIR 內
-    const resolvedPath = path.resolve(filePath);
-    const resolvedMarkdownDir = path.resolve(MARKDOWN_DIR);
-    if (!resolvedPath.startsWith(resolvedMarkdownDir)) {
-      return res.status(400).json({ error: 'Invalid file path: outside allowed directory' });
-    }
-
-    try {
-      await fs.access(filePath);
-    } catch (error) {
-      return res.status(404).json({ error: `File not found: ${sanitizedPath}` });
-    }
-
-    await fs.unlink(filePath);
-    res.json({ success: true, path: sanitizedPath });
-  } catch (error) {
-    console.error('Error deleting file:', error);
-    res.status(500).json({ error: error.message });
-  }
-});
-
-// 功能項目: 2.2.5 重命名文件
-app.patch('/api/files/:path(*)', authenticateToken, async (req, res) => {
-  try {
-    const { newPath } = req.body;
-    if (!newPath) {
-      return res.status(400).json({ error: 'New path is required' });
-    }
-
-    // 驗證並清理路徑
-    const sanitizedOldPath = sanitizePath(req.params.path);
-    const sanitizedNewPath = sanitizePath(newPath);
-
-    // 確保路徑是 markdown 文件
-    if (!sanitizedOldPath.toLowerCase().endsWith('.md') || !sanitizedNewPath.toLowerCase().endsWith('.md')) {
-      return res.status(400).json({ error: 'Only markdown files are allowed' });
-    }
-
-    const oldPath = path.join(MARKDOWN_DIR, sanitizedOldPath);
-    const targetPath = path.join(MARKDOWN_DIR, sanitizedNewPath);
-
-    // 確保路徑在 MARKDOWN_DIR 內
-    const resolvedOldPath = path.resolve(oldPath);
-    const resolvedNewPath = path.resolve(targetPath);
-    const resolvedMarkdownDir = path.resolve(MARKDOWN_DIR);
-    if (!resolvedOldPath.startsWith(resolvedMarkdownDir) || !resolvedNewPath.startsWith(resolvedMarkdownDir)) {
-      return res.status(400).json({ error: 'Invalid file path: outside allowed directory' });
-    }
-
-    // 檢查源文件是否存在
-    try {
-      await fs.access(oldPath);
-    } catch (error) {
-      return res.status(404).json({ error: `File not found: ${sanitizedOldPath}` });
-    }
-
-    // 檢查目標文件是否已存在
-    try {
-      await fs.access(targetPath);
-      return res.status(409).json({ error: `Target file already exists: ${sanitizedNewPath}` });
-    } catch (error) {
-      // 目標文件不存在，可以重命名
-    }
-
-    // 確保目標目錄存在
-    const targetDir = path.dirname(targetPath);
-    await fs.mkdir(targetDir, { recursive: true });
-
-    await fs.rename(oldPath, targetPath);
-    res.json({ success: true, oldPath: sanitizedOldPath, newPath: sanitizedNewPath });
-  } catch (error) {
-    console.error('Error renaming file:', error);
-    res.status(500).json({ error: error.message });
-  }
-});
-
-
-// Catch-all route to serve the frontend for all non-API requests
 app.get('*', (req, res) => {
-  // Check if the path starts with /api or /ws (WebSocket)
   if (req.path.startsWith('/api/') || req.path.startsWith('/ws/')) {
-    // If it's an API request, let it continue to 404
-    res.status(404).json({ error: 'API endpoint not found' });
-  } else {
-    // Otherwise, serve the frontend index.html
-    // Try app-react/dist first (containerized), then root dist (local development)
-    let indexPath = path.join(distPath, 'index.html');
-    if (!require('fs').existsSync(indexPath)) {
-      const rootIndexPath = path.join(__dirname, '..', 'dist', 'index.html');
-      if (require('fs').existsSync(rootIndexPath)) {
-        indexPath = rootIndexPath;
-      } else {
-        // If neither exists, send an error
-        return res.status(500).send('Frontend build not found. Please run build process.');
-      }
-    }
-    
-    res.sendFile(indexPath, (err) => {
-      if (err) {
-        // If there's an error serving index.html, send a simple response
-        res.status(500).send('Error loading the application');
-      }
-    });
+    return res.status(404).json({ error: 'API endpoint not found' });
   }
+
+  const fsSync = require('fs');
+  let indexPath = path.join(distPath, 'index.html');
+
+  if (!fsSync.existsSync(indexPath)) {
+    const rootIndexPath = path.join(rootDistPath, 'index.html');
+    if (fsSync.existsSync(rootIndexPath)) {
+      indexPath = rootIndexPath;
+    } else {
+      return res.status(500).send('Frontend build not found. Please run build process.');
+    }
+  }
+
+  res.sendFile(indexPath, (err) => {
+    if (err) res.status(500).send('Error loading the application');
+  });
 });
 
-// 啟動服務器
+// ============================================================================
+// Server Startup
+// ============================================================================
+
 server.listen(PORT, async () => {
   console.log(`Server running on port ${PORT}`);
   console.log(`Markdown directory: ${MARKDOWN_DIR}`);
   console.log(`WebSocket server available at ws://localhost:${PORT}/ws`);
 
-  // Load profile if specified
   const profileName = process.env.PROFILE_NAME;
   if (profileName) {
     try {
@@ -1482,4 +1022,10 @@ server.listen(PORT, async () => {
   } catch (err) {
     console.error('Error setting up file watcher:', err);
   }
+});
+
+// Error handler
+app.use((err, req, res, next) => {
+  console.error('Unhandled error:', err);
+  res.status(500).json({ error: err.message || 'Internal server error' });
 });
