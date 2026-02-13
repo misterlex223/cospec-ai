@@ -7,6 +7,7 @@ import { fileApi } from '../../services/api';
 import { cn } from '../../lib/utils';
 import { RequirementsView } from '../RequirementsView/RequirementsView';
 import { SystemDesignView } from '../SystemDesignView/SystemDesignView';
+import GitPanel from '../GitPanel';
 import './MarkdownEditorStyles.css';
 
 // 簡單的防抖函數實現
@@ -49,6 +50,7 @@ export function MarkdownEditor({ filePath, className }: MarkdownEditorProps) {
   const [content, setContent] = useState('');
   // 控制檔案資訊區塊的顯示
   const [showFileInfo, setShowFileInfo] = useState(true);
+  const [showGitPanel, setShowGitPanel] = useState(false);
   const navigate = useNavigate();
 
   // 獲取當前文件的目錄路徑
@@ -419,6 +421,21 @@ export function MarkdownEditor({ filePath, className }: MarkdownEditorProps) {
           }}
         />
       </div>
+      {/* Git Panel Toggle */}
+      <button
+        onClick={() => setShowGitPanel(!showGitPanel)}
+        className={`git-panel-toggle ${showGitPanel ? 'open' : ''}`}
+        title={showGitPanel ? 'Hide Git Panel' : 'Show Git Panel'}
+      >
+        {showGitPanel ? '◀' : '▶'}
+      </button>
+
+      {/* Git Panel - shown when enabled */}
+      {showGitPanel && (
+        <div className="git-panel-wrapper">
+          <GitPanel />
+        </div>
+      )}
     </div>
   );
 }
