@@ -83,3 +83,34 @@
   - 添加實時協作狀態顯示
   - 開發三向合併界面，輔助用戶解決衝突
   - 實現自動合併策略，減少簡單衝突的手動處理
+
+## Git Diff Integration
+
+### 功能描述
+在 Markdown Editor 中整合 Git Diff 功能，允許用戶檢視檔案版本歷史和差異。
+
+### 實作方式
+1. 在編輯器右側點擊 Git panel 切換按鈕
+2. 選擇「History」標籤查看提交歷史
+3. 選擇「Diff」標籤查看檔案變更
+4. 選擇「Status」標籤查看工作目錄狀態
+
+### 技術實作
+- 後端: GitService + Socket.IO 進度發送
+- 前端: React + Redux Toolkit
+- Diff 視圖: 自訂 DiffViewer 組件
+
+### 組件列表
+- `DiffViewer` - 顯示 Git diff hunks
+- `GitHistory` - 顯示提交歷史
+- `GitPanel` - Git 操作面板
+- `GitStatusDisplay` - 緊湊的 Git 狀態指示器
+
+### API 端點
+- GET `/api/git/status` - 取得 Git 狀態
+- GET `/api/git/log` - 取得提交歷史
+- GET `/api/git/commit/:id` - 取得單個提交
+- GET `/api/git/diff` - 取得差異
+- GET `/api/git/branches` - 取得分支列表
+- POST `/api/git/stage` - 暫存檔案
+- POST `/api/git/commit` - 提交變更
