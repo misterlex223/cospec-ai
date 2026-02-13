@@ -75,6 +75,25 @@ const MARKDOWN_DIR = process.env.MARKDOWN_DIR || path.join(__dirname, '..', 'mar
 const rateLimit = require('express-rate-limit');
 const helmet = require('helmet');
 
+// Agent Service
+const AgentService = require('./agentService');
+const AgentDB = require('./agentDb');
+
+// Initialize Agent DB and Service
+const agentDb = new AgentDB(path.join(__dirname, '..', 'agent-history.db'));
+let agentService;
+
+// Initialize Agent DB on startup
+agentDb.initialize()
+  .then(() => {
+    console.log('✓ Agent database initialized');
+    agentService = new AgentService(io, agentDb);
+    console.log('✓ Agent service ready');
+  })
+  .catch(err => {
+    console.error('✗ Failed to initialize agent database:', err);
+  });
+
 // 安全性中間件
 app.use(helmet()); // 添加多種安全頭部
 app.use(cors());
@@ -873,6 +892,108 @@ app.get('/api/profiles/:name/prompts/:path(*)', async (req, res) => {
     res.json({ content, path: promptPath });
   } catch (error) {
     console.error('Failed to read prompt file:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ============================================================================
+// Agent API Routes
+// ============================================================================
+
+// POST /api/agent/execute - Execute agent
+app.post('/api/agent/execute', authenticateToken, async (req, res) => {
+  try {
+    const { agentType, targetFiles, customPrompt, outputPath } = req.body;
+
+    if (!agentType || !targetFiles || !Array.isArray(targetFiles)) {
+      return res.status(400).json({
+        error: 'Missing required fields: agentType, targetFiles'
+      });
+    }
+
+    const validTypes = ['prd-analyzer', 'code-reviewer', 'doc-generator', 'version-advisor'];
+    if (!validTypes.includes(agentType)) {
+      return res.status(400).json({
+        error: `Invalid agentType. Must be one of: ${validTypes.join(', ')}`
+      });
+    }
+
+    if (!agentService) {
+      return res.status(503).json({ error: 'Agent service not ready' });
+    }
+
+    const result = await agentService.executeAgent(agentType, targetFiles, {
+      customPrompt,
+      outputPath
+    });
+
+    res.json(result);
+  } catch (error) {
+    console.error('Agent execution error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// GET /api/agent/history - Get agent execution history
+app.get('/api/agent/history', async (req, res) => {
+  try {
+    const { limit = 20, offset = 0, agentType, status } = req.query;
+
+    if (!agentDb) {
+      return res.status(503).json({ error: 'Agent database not ready' });
+    }
+
+    const executions = await agentDb.findAll({
+      limit: parseInt(limit),
+      offset: parseInt(offset),
+      agentType,
+      status
+    });
+
+    const stats = await agentDb.getStats();
+
+    res.json({
+      executions,
+      total: executions.length,
+      stats
+    });
+  } catch (error) {
+    console.error('Agent history error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// GET /api/agent/history/:id - Get single execution
+app.get('/api/agent/history/:id', async (req, res) => {
+  try {
+    if (!agentDb) {
+      return res.status(503).json({ error: 'Agent database not ready' });
+    }
+
+    const execution = await agentDb.findById(req.params.id);
+
+    if (!execution) {
+      return res.status(404).json({ error: 'Execution not found' });
+    }
+
+    res.json(execution);
+  } catch (error) {
+    console.error('Agent fetch error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// DELETE /api/agent/history/:id - Delete execution
+app.delete('/api/agent/history/:id', authenticateToken, async (req, res) => {
+  try {
+    if (!agentDb) {
+      return res.status(503).json({ error: 'Agent database not ready' });
+    }
+
+    await agentDb.delete(req.params.id);
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Agent delete error:', error);
     res.status(500).json({ error: error.message });
   }
 });
