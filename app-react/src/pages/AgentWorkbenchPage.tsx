@@ -1,6 +1,5 @@
-import React from 'react';
-import { AgentStatsPanel } from './AgentStatsPanel';
-import { AgentHistoryList } from './AgentHistoryList';
+import { AgentStatsPanel } from '../components/AgentWorkbench/AgentStatsPanel';
+import { AgentHistoryList } from '../components/AgentWorkbench/AgentHistoryList';
 import './agent-workbench-page.css';
 
 export function AgentWorkbenchPage() {

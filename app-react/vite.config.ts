@@ -7,7 +7,7 @@ export default defineConfig({
   base: './', // Use relative paths for assets to support reverse proxy
   server: {
     host: '0.0.0.0',
-    allowedHosts: ['themis.ambmh.app'],
+    allowedHosts: ['cospec-dev-test.ambmh.app'],
     port: 3000,
     proxy: {
       '/api': {

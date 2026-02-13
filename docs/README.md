@@ -2,9 +2,19 @@
 
 ## 文檔結構
 
+### 功能文件
+- [AGENT_PANEL.md](AGENT_PANEL.md) - Agent Panel 功能完整文件（架構、API、開發指南）
+- [AGENT_PANEL_USAGE.md](AGENT_PANEL_USAGE.md) - Agent Panel 前端使用指南
 - [requirements.md](requirements.md) - 應用功能需求規格
 - [solved_issues.md](solved_issues.md) - 已解決問題清單
 - [改善計劃.md](改善計劃.md) - 應用改善計劃
+
+### 計劃文件
+- [plans/](../project/plans/) - 開發計劃文件
+  - [2026-02-13-agent-panel-design.md](../project/plans/2026-02-13-agent-panel-design.md) - Agent Panel 設計文件
+  - [2026-02-13-agent-panel-implementation.md](../project/plans/2026-02-13-agent-panel-implementation.md) - Agent Panel 實作計劃
+
+### 變更記錄
 - [changelogs/](changelogs/) - 變更記錄
   - [README.md](changelogs/README.md) - 變更記錄說明
   - [2025-10-10-improvements.md](changelogs/2025-10-10-improvements.md) - 2025年10月10日改進記錄
@@ -22,6 +32,24 @@
 ```
 
 ## 主要組件
+
+### Agent Panel 功能
+
+CoSpec AI 整合了 AI Agent 功能，讓用戶可以快速執行 AI Agent 來分析文件。
+
+**支援的 Agent 類型：**
+- **PRD Analyzer** - 分析產品需求文件的完整性、清晰度、可行性
+- **Code Reviewer** - 代碼審查（安全性、品質、效能）
+- **Doc Generator** - 從程式碼生成 API 文檔、使用指南
+- **Version Advisor** - 根據 SemVer 建議版本號和發布策略
+
+**功能特色：**
+- 浮動面板快速執行
+- 即時執行進度追蹤
+- 獨立工作台管理執行歷史
+- 結果匯出（Markdown、PDF）
+
+詳細說明請參考 [AGENT_PANEL.md](AGENT_PANEL.md)
 
 ### 1. FileTree 組件
 

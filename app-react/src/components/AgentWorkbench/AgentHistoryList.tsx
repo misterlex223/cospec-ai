@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import { useEffect } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import type { RootState, AppDispatch } from '../../store';
 import { fetchAgentHistory, deleteAgentExecution } from '../../store/slices/agentSlice';
@@ -12,7 +12,7 @@ export function AgentHistoryList() {
   const isLoading = useSelector((state: RootState) => state.agent.isLoading);
 
   useEffect(() => {
-    dispatch(fetchAgentHistory());
+    dispatch(fetchAgentHistory({}));
   }, [dispatch]);
 
   const handleDelete = async (id: string) => {

@@ -7,6 +7,7 @@ import { FileTree } from '../components/FileTree/FileTree';
 import { MarkdownEditor } from '../components/MarkdownEditor/MarkdownEditor';
 import { DirectoryViewer } from '../components/DirectoryViewer/DirectoryViewer';
 import { Navigator } from '../components/Navigator/Navigator';
+import { AgentPanel } from '../components/AgentPanel';
 import { Bot } from 'lucide-react';
 import type { RootState } from '../store';
 
@@ -190,6 +191,9 @@ export function EditorPage() {
           )}
         </div>
       </div>
+
+      {/* Agent Panel */}
+      <AgentPanel />
     </div>
   );
 }
