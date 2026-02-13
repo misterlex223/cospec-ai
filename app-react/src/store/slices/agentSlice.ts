@@ -123,6 +123,31 @@ export const createConversation = createAsyncThunk(
   }
 );
 
+// Agent Git operations
+export const agentGitStatus = createAsyncThunk(
+  'agent/gitStatus',
+  async (repoPath?: string) => {
+    const response = await axios.post('/api/agent/git/status', { repoPath });
+    return response.data;
+  }
+);
+
+export const agentGitLog = createAsyncThunk(
+  'agent/gitLog',
+  async (params: { repoPath?: string; limit?: number; offset?: number }) => {
+    const response = await axios.post('/api/agent/git/log', params);
+    return response.data;
+  }
+);
+
+export const agentGitDiff = createAsyncThunk(
+  'agent/gitDiff',
+  async (params: { repoPath?: string; pathA?: string; pathB?: string }) => {
+    const response = await axios.post('/api/agent/git/diff', params);
+    return response.data;
+  }
+);
+
 const agentSlice = createSlice({
   name: 'agent',
   initialState,
@@ -279,6 +304,46 @@ const agentSlice = createSlice({
         state.conversations.unshift(newConversation);
         state.currentConversation = newConversation;
         state.chatMessages = newConversation.messages || [];
+      });
+
+    // Agent Git Status
+    builder
+      .addCase(agentGitStatus.pending, (state) => {
+        state.isLoading = true;
+        state.errorMessage = null;
+      })
+      .addCase(agentGitStatus.fulfilled, (state) => {
+        state.isLoading = false;
+      })
+      .addCase(agentGitStatus.rejected, (state, action) => {
+        state.isLoading = false;
+        state.errorMessage = action.error.message || 'Failed to get git status';
+      });
+
+    // Agent Git Log
+    builder
+      .addCase(agentGitLog.pending, (state) => {
+        state.isLoading = true;
+      })
+      .addCase(agentGitLog.fulfilled, (state) => {
+        state.isLoading = false;
+      })
+      .addCase(agentGitLog.rejected, (state, action) => {
+        state.isLoading = false;
+        state.errorMessage = action.error.message || 'Failed to get git log';
+      });
+
+    // Agent Git Diff
+    builder
+      .addCase(agentGitDiff.pending, (state) => {
+        state.isLoading = true;
+      })
+      .addCase(agentGitDiff.fulfilled, (state) => {
+        state.isLoading = false;
+      })
+      .addCase(agentGitDiff.rejected, (state, action) => {
+        state.isLoading = false;
+        state.errorMessage = action.error.message || 'Failed to get git diff';
       });
   },
 });
