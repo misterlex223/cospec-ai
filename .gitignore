@@ -6,6 +6,10 @@
 .cospec-sync/
 .kai-notify.json
 
+# Claude Code
+.claude/
+
+# Development
 .pnpm-store/
 node_modules/
 work/
@@ -13,7 +17,7 @@ dist/
 .DS_Store
 *.log
 
-.wrangler/state/*
+.wrangler/
 figma-mocks/
 app-react/playwright-report/
 app-react/test-results/
