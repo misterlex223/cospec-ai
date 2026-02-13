@@ -13,6 +13,7 @@ import type {
   GitState as GitStateType,
 } from '../../types/git';
 import * as gitApi from '../../services/git';
+import { webSocketService } from '../../services/websocket';
 
 export interface GitState extends GitStateType {
   stagedFiles: string[];
@@ -125,6 +126,12 @@ const gitSlice = createSlice({
     setDiffView: (state, action: PayloadAction<{ pathA?: string; pathB?: string } | null>) => {
       state.diffView = action.payload;
     },
+    setGitProgress: (state, action: PayloadAction<{ type: string; data: any; timestamp: string }>) => {
+      // Handle git progress updates from WebSocket
+      if (action.payload.type === 'error') {
+        state.errorMessage = action.payload.data?.toString() || 'Git operation failed';
+      }
+    },
   },
   extraReducers: (builder) => {
     // fetchStatus
@@ -222,6 +229,7 @@ export const {
   clearStagedFiles,
   setSelectedCommit,
   setDiffView,
+  setGitProgress,
 } = gitSlice.actions;
 
 export default gitSlice.reducer;

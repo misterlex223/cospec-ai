@@ -70,6 +70,12 @@ class WebSocketService {
         this.dispatchEvent('generation-complete', data);
       });
 
+      // Listen for git-progress events
+      this.socket.on('git-progress', (data) => {
+        console.log('Git progress:', data);
+        this.dispatchEvent('git-progress', data);
+      });
+
       // Generic message handler - dispatch custom events
       this.socket.onAny((eventName, ...args) => {
         this.dispatchEvent(eventName, args[0] || {});

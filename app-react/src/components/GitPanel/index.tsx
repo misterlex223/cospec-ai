@@ -164,7 +164,7 @@ const GitPanel: React.FC<GitPanelProps> = ({ className = '' }) => {
                         <div key={index} className="git-file-item rename">
                           <span className="git-file-icon">📝</span>
                           <span className="git-file-paths">
-                            {result.oldPath} → {result.newPath}
+                            {(result as any).oldPath} → {(result as any).path}
                           </span>
                         </div>
                       );

@@ -6,7 +6,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
-import type { RootState } from '../../store';
+import type { RootState, AppDispatch } from '../../store';
 import { fetchLog, fetchBranches, setSelectedCommit } from '../../store/slices/gitSlice';
 import type { GitCommit } from '../../types/git';
 import './GitHistory.css';
@@ -14,21 +14,25 @@ import './GitHistory.css';
 export interface GitHistoryProps {
   onCommitSelect?: (commit: GitCommit) => void;
   selectedCommitId?: string | null;
+  limit?: number;
+  offset?: number;
 }
 
 const GitHistory: React.FC<GitHistoryProps> = ({
   onCommitSelect,
   selectedCommitId,
+  limit = 20,
+  offset = 0,
 }) => {
-  const dispatch = useDispatch();
+  const dispatch = useDispatch<AppDispatch>();
   const { commits, branches, currentBranch, isLoading } = useSelector(
     (state: RootState) => state.git
   );
   const [expandedCommit, setExpandedCommit] = useState<string | null>(null);
 
   useEffect(() => {
-    dispatch(fetchLog() as any);
-    dispatch(fetchBranches() as any);
+    dispatch(fetchLog({ limit, offset }));
+    dispatch(fetchBranches());
   }, [dispatch]);
 
   const handleCommitClick = (commit: GitCommit) => {

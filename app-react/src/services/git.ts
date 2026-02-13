@@ -4,7 +4,29 @@
  * Frontend API functions for Git operations
  */
 
-import api from './api';
+import axios from 'axios';
+
+const API_KEY = 'demo-api-key';
+let baseURL = './api';
+if (import.meta.env.MODE === 'production') {
+  baseURL = './api';
+} else {
+  baseURL = '/api';
+}
+
+const api = axios.create({
+  baseURL: baseURL,
+});
+
+api.interceptors.request.use(
+  (config) => {
+    config.headers.Authorization = `Bearer ${API_KEY}`;
+    return config;
+  },
+  (error) => {
+    return Promise.reject(error);
+  }
+);
 import type {
   GitStatusResult,
   GitCommit,
