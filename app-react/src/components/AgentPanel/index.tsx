@@ -182,7 +182,10 @@ export function AgentPanel() {
               handleRun();
               setShowPrompt(false);
             }}
-            onReturn={() => setShowPrompt(false)}
+            onReturn={() => {
+              // Close the panel completely
+              dispatch(closePanel());
+            }}
           />
         )}
       </div>
