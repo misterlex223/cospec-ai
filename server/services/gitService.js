@@ -6,8 +6,6 @@
 
 const { spawn } = require('child_process');
 const path = require('path');
-const fs = require('fs').promises;
-const { v4: uuidv4 } = require('uuid');
 
 class GitService {
   constructor(repoPath) {
@@ -20,7 +18,7 @@ class GitService {
    */
   async exec(command, args = []) {
     return new Promise((resolve, reject) => {
-      const gitCmd = spawn('git', ['--git-dir', this.gitDir, ...args.map(a => a.toString()), ...command], {
+      const gitCmd = spawn('git', ['--git-dir', this.gitDir, ...args.map(a => a.toString()), command], {
         cwd: this.repoPath,
         env: { ...process.env }
       });
@@ -72,11 +70,11 @@ class GitService {
       }
 
       // Parse file changes
-      const match = line.match(/^([A-Z])\d+\s+(.+)$/);
+      const match = line.match(/^([MADR? ?])(?:\s+(\d+))?\s+(.+)$/);
       if (match) {
-        const [_, status, filePath] = match;
+        const [_, status, score, filePath] = match;
         if (currentResult) currentResult = { success: true };
-        results.push({ type: 'file', status, path: filePath });
+        results.push({ type: 'file', status: status.trim(), path: filePath });
         continue;
       }
 
@@ -144,7 +142,7 @@ class GitService {
    */
   async getCommit(id) {
     try {
-      const result = await this.exec('show', ['--format=%h', '--stat']);
+      const result = await this.exec('show', [id, '--format=%h', '--stat']);
       return this.parseGitOutput(result.output);
     } catch (error) {
       return { success: false, results: [], output: '', error: error.error };
