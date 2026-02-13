@@ -339,6 +339,18 @@ class AgentDB {
         INSERT INTO agent_messages (id, conversation_id, role, content, created_at)
         VALUES (?, ?, ?, ?, ?)
       `;
+      this.db.run(sql, [
+        id,
+        conversationId,
+        role,
+        content,
+        now
+      ], function(err) {
+        if (err) reject(err);
+        else resolve(id);
+      });
+    });
+  }
 
       this.db.run(sql, [
         id,

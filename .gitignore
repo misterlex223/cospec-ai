@@ -18,5 +18,8 @@ figma-mocks/
 app-react/playwright-report/
 app-react/test-results/
 
+# CoSpec AI
 agent-history.db
 .agent-output
+
+.serena/
