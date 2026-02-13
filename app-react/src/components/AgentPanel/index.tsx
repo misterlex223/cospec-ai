@@ -195,7 +195,8 @@ export function AgentPanel() {
           <AgentPrompt
             targetFile={filePath || null}
             onReturn={() => {
-              // In chat mode, return button clears current conversation
+              // In chat mode, return button closes panel and clears current conversation
+              dispatch(closePanel());
               dispatch(setCurrentConversation(null as any));
             }}
           />
