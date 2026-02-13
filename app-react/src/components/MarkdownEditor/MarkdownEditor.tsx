@@ -5,10 +5,8 @@ import Vditor from 'vditor';
 import 'vditor/dist/index.css';
 import { fileApi } from '../../services/api';
 import { cn } from '../../lib/utils';
-import { AIAssistant } from '../AIAssistant/AIAssistant';
 import { RequirementsView } from '../RequirementsView/RequirementsView';
 import { SystemDesignView } from '../SystemDesignView/SystemDesignView';
-import '../AIAssistant/AIAssistant.css';
 import './MarkdownEditorStyles.css';
 
 // 簡單的防抖函數實現
@@ -421,22 +419,6 @@ export function MarkdownEditor({ filePath, className }: MarkdownEditorProps) {
           }}
         />
       </div>
-
-      {/* AI 助理組件 */}
-      <AIAssistant
-        currentContent={content}
-        onContentUpdate={(newContent) => {
-          setContent(newContent);
-          if (vditorRef.current && (vditorRef.current as any).element) {
-            try {
-              vditorRef.current.setValue(newContent);
-            } catch (error) {
-              console.warn('Error setting Vditor value:', error);
-            }
-            saveContent(newContent); // 使用防抖保存
-          }
-        }}
-      />
     </div>
   );
 }
