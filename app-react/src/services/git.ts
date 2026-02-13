@@ -5,41 +5,26 @@
  */
 
 import axios from 'axios';
-
-const API_KEY = 'demo-api-key';
-let baseURL = './api';
-if (import.meta.env.MODE === 'production') {
-  baseURL = './api';
-} else {
-  baseURL = '/api';
-}
-
-const api = axios.create({
-  baseURL: baseURL,
-});
-
-api.interceptors.request.use(
-  (config) => {
-    config.headers.Authorization = `Bearer ${API_KEY}`;
-    return config;
-  },
-  (error) => {
-    return Promise.reject(error);
-  }
-);
 import type {
-  GitStatusResult,
+  GitBranch,
   GitCommit,
   GitDiffResult,
-  GitBranch,
+  GitStatusResult,
 } from '../types/git';
 
-/**
- * Get git repository status
- */
+const API_KEY = 'demo-api-key';
+const baseURL = import.meta.env.MODE === 'production' ? './api' : '/api';
+
+const api = axios.create({ baseURL });
+
+api.interceptors.request.use((config) => {
+  config.headers.Authorization = `Bearer ${API_KEY}`;
+  return config;
+});
+
 export const getStatus = async (): Promise<GitStatusResult> => {
-  const response = await api.get('/git/status');
-  return response.data;
+  const { data } = await api.get<GitStatusResult>('/git/status');
+  return data;
 };
 
 /**
