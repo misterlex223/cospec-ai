@@ -298,7 +298,6 @@ export const {
   addChatMessage,
   appendToLastMessage,
   setStreamingChat,
-  createConversation,
 } = agentSlice.actions;
 
 export default agentSlice.reducer;

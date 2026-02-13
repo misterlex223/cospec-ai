@@ -191,6 +191,7 @@ export function AgentOutputViewer() {
             </div>
           )}
         </div>
+      </div>
 
       <div className="output-actions">
         <button className="pe-btn pe-btn-ghost" onClick={loadOutput}>

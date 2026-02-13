@@ -1,6 +1,7 @@
 import axios from 'axios';
 import { addNotification } from '../store/slices/notificationsSlice';
 import { store } from '../store';
+import type { AgentExecution } from '../types/agent';
 
 const API_KEY = 'demo-api-key'; // In a real app, this would be securely stored
 
@@ -242,13 +243,8 @@ export const validateProfile = async (): Promise<ProfileValidation> => {
 // Agent API
 // ============================================================================
 
-export interface AgentType {
-  id: string;
-  name: string;
-  description: string;
-  icon: string;
-  capabilities: string[];
-}
+// AgentType is now imported from types/agent.ts
+// The API returns detailed agent info which maps to the simple type
 
 export interface AgentSuggestion {
   id: string;
@@ -268,8 +264,21 @@ export interface Conversation {
   agentType: string;
   messages: ChatMessage[];
   contextFiles: string[];
+  status?: 'active' | 'archived';
   createdAt: string;
   updatedAt: string;
+}
+
+// Re-export AgentExecution for convenience
+export type { AgentExecution } from '../types/agent';
+
+// Agent type returned by API (has detailed info)
+export interface AgentType {
+  id: string;
+  name: string;
+  description: string;
+  icon: string;
+  capabilities: string[];
 }
 
 export interface ChatResponse {

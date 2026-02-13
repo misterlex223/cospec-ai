@@ -7,7 +7,7 @@
 
 import React, { useState } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
-import type { RootState } from '../../store';
+import type { RootState, AppDispatch } from '../../store';
 import { Play, MessageSquare } from 'lucide-react';
 import { sendAgentChat } from '../../store/slices/agentSlice';
 import { toast } from 'react-toastify';
@@ -19,6 +19,7 @@ interface QuickRunButtonProps {
   conversationId?: string | null;
   mode?: 'execution' | 'chat';
   disabled?: boolean;
+  onRun?: () => void;
 }
 
 export function QuickRunButton({
@@ -27,9 +28,10 @@ export function QuickRunButton({
   inputMessage,
   conversationId,
   mode = 'execution',
-  disabled
+  disabled,
+  onRun
 }: QuickRunButtonProps) {
-  const dispatch = useDispatch();
+  const dispatch = useDispatch<AppDispatch>();
   const isLoading = useSelector((state: RootState) => state.agent.isLoading);
   const currentConversation = useSelector((state: RootState) => state.agent.currentConversation);
 
@@ -54,8 +56,9 @@ export function QuickRunButton({
           conversationId: conversationId || currentConversation?.id
         })).unwrap();
         toast.success('訊息已發送');
-      } catch (error: any) {
-        toast.error(error.message || '發送失敗');
+      } catch (error: unknown) {
+        const errMsg = error instanceof Error ? error.message : '發送失敗';
+        toast.error(errMsg);
       } finally {
         setIsSending(false);
       }
@@ -88,7 +91,7 @@ export function QuickRunButton({
   return (
     <button
       className={`pe-btn pe-btn-primary ${canExecute ? '' : 'disabled'}`}
-      onClick={handleClick}
+      onClick={onRun}
       disabled={!canExecute}
       title="執行 Agent"
     >

@@ -1,4 +1,5 @@
 import { ConversationsList } from '../components/AgentWorkbench/ConversationsList';
+import { AgentHistoryList } from '../components/AgentWorkbench/AgentHistoryList';
 import { AgentStatsPanel } from '../components/AgentWorkbench/AgentStatsPanel';
 import './agent-workbench-page.css';
 import { useState } from 'react';

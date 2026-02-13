@@ -11,7 +11,7 @@ import { fetchAgentHistory, deleteAgentExecution, fetchConversations, deleteConv
 import type { AgentExecution, Conversation } from '../../services/api';
 import { Trash2, ExternalLink, MessageSquare, Play } from 'lucide-react';
 import { toast } from 'react-toastify';
-import './agent-history-list.css';
+import './conversations-list.css';
 
 interface ConversationsListProps {
   onSelectConversation?: (conversation: Conversation) => void;

@@ -10,7 +10,6 @@ import { useSelector, useDispatch } from 'react-redux';
 import type { RootState, AppDispatch } from '../../store';
 import { X } from 'lucide-react';
 import { AgentSelector } from './AgentSelector';
-import type { AgentType } from '../../types/agent';
 import { QuickRunButton } from './QuickRunButton';
 import { closePanel, sendAgentChat, fetchAgentSuggestions, setCurrentConversation } from '../../store/slices/agentSlice';
 import { toast } from 'react-toastify';
@@ -31,7 +30,7 @@ export function AgentPanel() {
 
   // Agent mode and conversation state
   const [agentMode, setAgentMode] = useState<AgentMode>('execution');
-  const [selectedAgent, setSelectedAgent] = useState<AgentType | null>(null);
+  const [selectedAgent, setSelectedAgent] = useState<string | null>(null);
   const [showPrompt, setShowPrompt] = useState(false);
 
   // Auto-switch to chat mode when a conversation is selected
@@ -64,13 +63,14 @@ export function AgentPanel() {
       const result = await dispatch(sendAgentChat({
         message: `分析並處理文件：${filePath}`,
         contextFiles: [filePath],
-        agentType: selectedAgent.id,
+        agentType: selectedAgent,
         conversationId: undefined // Always create new conversation for execution mode
       })).unwrap();
 
       toast.success('Agent 已啟動');
-    } catch (error: any) {
-      toast.error(error.message || 'Agent 執行失敗');
+    } catch (error: unknown) {
+      const errMsg = error instanceof Error ? error.message : 'Agent 執行失敗';
+      toast.error(errMsg);
     }
   };
 
@@ -116,7 +116,7 @@ export function AgentPanel() {
       <div className="agent-panel-content">
         <AgentSelector
           selectedAgent={selectedAgent}
-          onAgentChange={(agent) => setSelectedAgent(agent as AgentType)}
+          onAgentChange={(agent) => setSelectedAgent(agent)}
         />
 
         <div className="agent-panel-actions">
@@ -131,7 +131,7 @@ export function AgentPanel() {
                 </div>
               )}
               <QuickRunButton
-                selectedAgent={selectedAgent?.id || null}
+                selectedAgent={selectedAgent || null}
                 targetFile={filePath || null}
                 inputMessage={undefined}
                 conversationId={currentConversation?.id}
@@ -148,7 +148,7 @@ export function AgentPanel() {
                 {showPrompt ? '返回編輯器' : '手動提示'}
               </button>
               <QuickRunButton
-                selectedAgent={selectedAgent?.id || null}
+                selectedAgent={selectedAgent || null}
                 targetFile={filePath || null}
                 onRun={handleRun}
                 mode="execution"
