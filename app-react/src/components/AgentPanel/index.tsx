@@ -14,6 +14,7 @@ import { closePanel, executeAgent } from '../../store/slices/agentSlice';
 import type { AgentType } from '../../types/agent';
 import { toast } from 'react-toastify';
 import { useParams } from 'react-router-dom';
+import { AgentPrompt } from './AgentPrompt';
 import './agent-panel.css';
 
 export function AgentPanel() {
@@ -23,8 +24,7 @@ export function AgentPanel() {
   const currentExecution = useSelector((state: RootState) => state.agent.currentExecution);
 
   const [selectedAgent, setSelectedAgent] = useState<AgentType | null>(null);
-  const [showAdvanced, setShowAdvanced] = useState(false);
-  const [customPrompt, setCustomPrompt] = useState('');
+  const [showPrompt, setShowPrompt] = useState(false);
 
   if (!isPanelOpen) return null;
 
@@ -34,13 +34,29 @@ export function AgentPanel() {
     try {
       const result = await dispatch(executeAgent({
         agentType: selectedAgent,
-        targetFiles: [filePath],
-        customPrompt: showAdvanced ? customPrompt : undefined
+        targetFiles: [filePath!],
       })).unwrap();
 
       toast.success('Agent 已啟動');
       // Optional: Navigate to result page
       // window.location.hash = `#/agent/result/${result.executionId}`;
+    } catch (error: any) {
+      toast.error(error.message || 'Agent 執行失敗');
+    }
+  };
+
+  const handlePromptExecute = async (prompt: string) => {
+    if (!filePath) return;
+
+    try {
+      const result = await dispatch(executeAgent({
+        agentType: selectedAgent || 'general',
+        targetFiles: [filePath!],
+        customPrompt: prompt
+      })).unwrap();
+
+      toast.success('Agent 已啟動');
+      setShowPrompt(false);
     } catch (error: any) {
       toast.error(error.message || 'Agent 執行失敗');
     }
@@ -64,32 +80,29 @@ export function AgentPanel() {
           onAgentChange={setSelectedAgent}
         />
 
-        {showAdvanced && (
-          <div className="advanced-options">
-            <label className="pe-label">自訂 Prompt（可選）</label>
-            <textarea
-              className="pe-textarea"
-              value={customPrompt}
-              onChange={(e) => setCustomPrompt(e.target.value)}
-              placeholder="輸入自訂指令..."
-              rows={3}
-            />
-          </div>
-        )}
-
-        <button
-          className="pe-btn pe-btn-ghost"
-          onClick={() => setShowAdvanced(!showAdvanced)}
-        >
-          {showAdvanced ? '隱藏進階選項' : '顯示進階選項'}
-        </button>
-
         <div className="agent-panel-actions">
-          <QuickRunButton
-            selectedAgent={selectedAgent}
-            targetFile={filePath || null}
-            onRun={handleRun}
-          />
+          {showPrompt ? (
+            <button
+              className="pe-btn pe-btn-primary"
+              onClick={() => setShowPrompt(false)}
+            >
+              返回
+            </button>
+          ) : (
+            <>
+              <button
+                className="pe-btn pe-btn-ghost"
+                onClick={() => setShowPrompt(true)}
+              >
+                對手模式
+              </button>
+              <QuickRunButton
+                selectedAgent={selectedAgent}
+                targetFile={filePath || null}
+                onRun={handleRun}
+              />
+            </>
+          )}
         </div>
 
         {currentExecution && (
@@ -109,6 +122,13 @@ export function AgentPanel() {
           </div>
         )}
       </div>
+
+      {showPrompt && filePath && (
+        <AgentPrompt
+          targetFile={filePath}
+          onExecute={handlePromptExecute}
+        />
+      )}
     </div>
   );
 }

@@ -1,0 +1,389 @@
+.agent-prompt {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: #ffffff;
+  display: flex;
+  flex-direction: column;
+  z-index: 1000;
+}
+
+.agent-prompt-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid #e2e8f0;
+  background-color: #f8fafc;
+}
+
+.agent-prompt-header h3 {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 600;
+  color: #1f2937;
+}
+
+.agent-prompt-close {
+  background: none;
+  border: none;
+  color: #64748b;
+  cursor: pointer;
+  padding: 0.25rem;
+  border-radius: 0.25rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s ease;
+}
+
+.agent-prompt-close:hover {
+  background-color: #f1f5f9;
+  color: #1f2937;
+}
+
+.agent-prompt-context {
+  padding: 0.5rem 1rem;
+  background-color: #eff6ff;
+  border-bottom: 1px solid #dbeafe;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.agent-prompt-context .context-file {
+  background-color: #3b82f6;
+  color: #ffffff;
+  padding: 0.125rem 0.5rem;
+  border-radius: 0.25rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+
+.agent-prompt-context .context-text {
+  color: #1e40af;
+  font-size: 0.875rem;
+}
+
+.agent-prompt-messages {
+  flex: 1;
+  overflow-y: auto;
+  padding: 1rem;
+  background-color: #fafafa;
+}
+
+.agent-prompt-welcome {
+  background-color: #ffffff;
+  border-radius: 0.5rem;
+  padding: 1.5rem;
+  margin-bottom: 1rem;
+}
+
+.agent-prompt-welcome p {
+  margin: 0 0 0.75rem 0;
+  color: #4b5563;
+}
+
+.agent-prompt-welcome ul {
+  margin: 0.75rem 0 0 0;
+  padding-left: 1.5rem;
+  color: #4b5563;
+}
+
+.agent-prompt-welcome li {
+  margin-bottom: 0.5rem;
+  line-height: 1.5;
+}
+
+.agent-prompt-welcome code {
+  background-color: #f3f4f6;
+  color: #1f2937;
+  padding: 0.125rem 0.375rem;
+  border-radius: 0.25rem;
+  font-size: 0.8125rem;
+}
+
+.agent-prompt-message {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+  padding: 1rem;
+  border-radius: 0.5rem;
+  background-color: #ffffff;
+  animation: messageIn 0.2s ease;
+}
+
+@keyframes messageIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.agent-prompt-message.user {
+  background-color: #f3f4f6;
+}
+
+.agent-prompt-message.assistant {
+  background-color: #ffffff;
+  border: 1px solid #e2e8f0;
+}
+
+.agent-prompt-message .message-content {
+  flex: 1;
+  gap: 0.5rem;
+}
+
+.agent-prompt-message .message-sender {
+  font-weight: 500;
+  color: #64748b;
+}
+
+.agent-prompt-message .message-text {
+  flex: 1;
+  color: #1f2937;
+  line-height: 1.5;
+}
+
+.agent-prompt-message .message-text.loading {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.agent-prompt-message .loading-icon {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.agent-prompt-message .message-time {
+  font-size: 0.75rem;
+  color: #9ca3af;
+  margin-left: auto;
+}
+
+.agent-prompt-input-area {
+  display: flex;
+  gap: 0.5rem;
+  padding: 1rem;
+  background-color: #ffffff;
+  border-top: 1px solid #e2e8f0;
+}
+
+.agent-prompt-textarea {
+  flex: 1;
+  padding: 0.75rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 0.375rem;
+  font-size: 0.9375rem;
+  font-family: inherit;
+  resize: none;
+  outline: none;
+  transition: border-color 0.15s ease;
+}
+
+.agent-prompt-textarea:focus {
+  border-color: #3b82f6;
+}
+
+.agent-prompt-textarea:disabled {
+  background-color: #f8fafc;
+  cursor: not-allowed;
+}
+
+.agent-prompt-send {
+  background-color: #3b82f6;
+  color: #ffffff;
+  border: none;
+  border-radius: 0.375rem;
+  padding: 0 5rem 0.75rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s ease;
+}
+
+.agent-prompt-send:hover:not(:disabled) {
+  background-color: #2563eb;
+}
+
+.agent-prompt-send:disabled {
+  background-color: #cbd5e1;
+  cursor: not-allowed;
+}
+
+.agent-prompt-suggestions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  padding: 1rem;
+  background-color: #f8fafc;
+  border-top: 1px solid #e2e8f0;
+}
+
+.suggestion-chip {
+  background-color: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 1rem;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.875rem;
+  color: #4b5563;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.suggestion-chip:hover {
+  background-color: #f3f4f6;
+  border-color: #3b82f6;
+  color: #1f2937;
+}
+
+/* Scrollbar styling */
+.agent-prompt-messages::-webkit-scrollbar {
+  width: 0.375rem;
+}
+
+.agent-prompt-messages::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.agent-prompt-messages::-webkit-scrollbar-thumb {
+  background-color: #cbd5e1;
+  border-radius: 0.1875rem;
+}
+
+.agent-prompt-messages::-webkit-scrollbar-thumb:hover {
+  background-color: #94a3b8;
+}
+
+/* Dark mode support */
+@media (prefers-color-scheme: dark) {
+  .agent-prompt {
+    background-color: #1f2937;
+  }
+
+  .agent-prompt-header {
+    background-color: #1f2937;
+    border-bottom-color: #374151;
+  }
+
+  .agent-prompt-header h3 {
+    color: #f8fafc;
+  }
+
+  .agent-prompt-close {
+    color: #94a3b8;
+  }
+
+  .agent-prompt-close:hover {
+    background-color: #374151;
+    color: #f8fafc;
+  }
+
+  .agent-prompt-context {
+    background-color: #1e3a8a;
+    border-bottom-color: #374151;
+  }
+
+  .agent-prompt-context .context-text {
+    color: #cbd5e1;
+  }
+
+  .agent-prompt-messages {
+    background-color: #0f172a;
+  }
+
+  .agent-prompt-welcome {
+    background-color: #1f2937;
+  }
+
+  .agent-prompt-welcome p,
+  .agent-prompt-welcome li {
+    color: #cbd5e1;
+  }
+
+  .agent-prompt-welcome code {
+    background-color: #374151;
+    color: #f8fafc;
+  }
+
+  .agent-prompt-message.user {
+    background-color: #1e3a8a;
+  }
+
+  .agent-prompt-message.assistant {
+    background-color: #0f172a;
+    border-color: #374151;
+  }
+
+  .agent-prompt-message .message-sender {
+    color: #cbd5e1;
+  }
+
+  .agent-prompt-message .message-text {
+    color: #e2e8f0;
+  }
+
+  .agent-prompt-message .message-time {
+    color: #78716c;
+  }
+
+  .agent-prompt-input-area {
+    background-color: #0f172a;
+    border-top-color: #374151;
+  }
+
+  .agent-prompt-textarea {
+    background-color: #1f2937;
+    border-color: #374151;
+    color: #e2e8f0;
+  }
+
+  .agent-prompt-textarea:focus {
+    border-color: #3b82f6;
+  }
+
+  .agent-prompt-send {
+    background-color: #3b82f6;
+  }
+
+  .agent-prompt-send:hover:not(:disabled) {
+    background-color: #60a5fa;
+  }
+
+  .agent-prompt-send:disabled {
+    background-color: #374151;
+  }
+
+  .agent-prompt-suggestions {
+    background-color: #0f172a;
+    border-top-color: #374151;
+  }
+
+  .suggestion-chip {
+    background-color: #1f2937;
+    border-color: #374151;
+    color: #cbd5e1;
+  }
+
+  .suggestion-chip:hover {
+    background-color: #1e3a8a;
+    border-color: #3b82f6;
+    color: #f8fafc;
+  }
+}
