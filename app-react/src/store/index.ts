@@ -7,6 +7,7 @@ import contextReducer from './slices/contextSlice';
 import profileReducer from './slices/profileSlice';
 import profileEditorReducer from './slices/profileEditorSlice';
 import agentReducer from './slices/agentSlice';
+import gitReducer from './slices/gitSlice';
 
 export const store = configureStore({
   reducer: {
@@ -18,6 +19,7 @@ export const store = configureStore({
     profile: profileReducer,
     profileEditor: profileEditorReducer,
     agent: agentReducer,
+    git: gitReducer,
   },
   middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware({
