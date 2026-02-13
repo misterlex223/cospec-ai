@@ -5,11 +5,15 @@ import { store } from './store'
 import App from './App.tsx'
 import ProfileEditorApp from './ProfileEditorApp.tsx'
 import ErrorBoundary from './components/ErrorBoundary/ErrorBoundary'
+import { connectAgentWebSocket } from './services/agentWebSocket'
 import './index.css'
 
 // Check if we're in profile editor mode
 async function initializeApp() {
   try {
+    // Initialize Agent WebSocket
+    connectAgentWebSocket();
+
     const response = await fetch('./api/config');
     const config = await response.json();
 

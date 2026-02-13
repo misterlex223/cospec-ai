@@ -6,6 +6,7 @@ import notificationsReducer from './slices/notificationsSlice';
 import contextReducer from './slices/contextSlice';
 import profileReducer from './slices/profileSlice';
 import profileEditorReducer from './slices/profileEditorSlice';
+import agentReducer from './slices/agentSlice';
 
 export const store = configureStore({
   reducer: {
@@ -16,6 +17,7 @@ export const store = configureStore({
     context: contextReducer,
     profile: profileReducer,
     profileEditor: profileEditorReducer,
+    agent: agentReducer,
   },
   middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware({
