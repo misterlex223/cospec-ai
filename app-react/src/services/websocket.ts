@@ -70,10 +70,10 @@ class WebSocketService {
         this.dispatchEvent('generation-complete', data);
       });
 
-      // Generic message handler
+      // Generic message handler - dispatch custom events
       this.socket.onAny((eventName, ...args) => {
-        this.dispatchEvent(eventName, args[0]);
-        this.dispatchEvent('message', { type: eventName, data: args[0] });
+        this.dispatchEvent(eventName, args[0] || {});
+        this.dispatchEvent('message', { type: eventName, data: args[0] || {} });
       });
 
       this.socket.on('disconnect', (reason) => {

@@ -1,33 +1,14 @@
-/**
- * FileTree Component - Pure CSS Version
- *
- * This is an example implementation using pure CSS classes from FileTree.css
- * instead of Tailwind utility classes. This approach provides:
- * - Better CSS isolation
- * - Easier maintenance
- * - Better performance (no runtime class computation)
- * - Cleaner JSX markup
- *
- * To use this version:
- * 1. Backup current FileTree.tsx
- * 2. Rename this file to FileTree.tsx
- * 3. Test thoroughly
- */
-
-import React, { useEffect, memo, useCallback, useState } from 'react';
+import { useEffect, memo, useCallback, useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useSelector, useDispatch } from 'react-redux';
 import { setFileList, setLoading, refreshFileList } from '../../store/slices/filesSlice';
 import { togglePathExpanded, expandPath } from '../../store/slices/uiSlice';
 import { addNotification } from '../../store/slices/notificationsSlice';
-import { syncFileToContext, unsyncFileFromContext, fetchSyncStatus } from '../../store/slices/contextSlice';
-import { generateFile } from '../../store/slices/profileSlice';
-import { fileApi, type FileInfo } from '../../services/api';
-import { cn } from '../../lib/utils';
-import { Button } from '../ui/button';
-import { webSocketService, connectWebSocket } from '../../services/websocket';
+import { Search, File, ChevronDown, ChevronRight, FolderOpen, FolderClosed } from 'lucide-react';
 import type { RootState } from '../../store';
-import type { AppDispatch } from '../../store';
+import { fileApi } from '../../services/api';
+import webSocketService from '../../services/websocket';
+import { cn } from '../../lib/utils';
 import './FileTree.css';
 
 interface TreeNode {
@@ -36,13 +17,6 @@ interface TreeNode {
   path: string;
   children?: TreeNode[];
   exists?: boolean;
-  profileMetadata?: {
-    required: boolean;
-    documentName: string;
-    description: string;
-    hasPrompt: boolean;
-    hasCommand: boolean;
-  };
 }
 
 interface FileTreeProps {
@@ -56,13 +30,13 @@ interface FileNodeProps {
   onFileClick: (path: string) => void;
   onDirectoryToggle: (path: string) => void;
   onDirectoryClick?: (path: string) => void;
+  depth: number;
 }
 
-const FileNode = memo(({ node, currentPath, expandedPaths, onFileClick, onDirectoryToggle, onDirectoryClick }: FileNodeProps) => {
-  const dispatch = useDispatch<AppDispatch>();
-  const syncStatus = useSelector((state: RootState) => state.context.syncStatuses[node.path]);
+const FileNode = memo(({ node, currentPath, expandedPaths, onFileClick, onDirectoryToggle, onDirectoryClick, depth }: FileNodeProps) => {
   const [showContextMenu, setShowContextMenu] = useState(false);
   const [menuPosition, setMenuPosition] = useState({ x: 0, y: 0 });
+  const dispatch = useDispatch();
 
   const handleContextMenu = (e: React.MouseEvent) => {
     if (node.type === 'file' && node.name.endsWith('.md')) {
@@ -72,219 +46,83 @@ const FileNode = memo(({ node, currentPath, expandedPaths, onFileClick, onDirect
     }
   };
 
-  const handleSyncToContext = async () => {
-    try {
-      await dispatch(syncFileToContext(node.path)).unwrap();
-      dispatch(addNotification({
-        type: 'success',
-        message: `Synced ${node.name} to context`,
-        title: 'Context Sync'
-      }));
-    } catch (error: any) {
-      dispatch(addNotification({
-        type: 'error',
-        message: error.message || 'Failed to sync file',
-        title: 'Sync Error'
-      }));
-    }
-    setShowContextMenu(false);
-  };
+  const isExpanded = expandedPaths.has(node.path);
+  const isSelected = currentPath === node.path;
+  const isMissing = node.exists === false;
 
-  const handleUnsyncFromContext = async () => {
-    try {
-      await dispatch(unsyncFileFromContext(node.path)).unwrap();
-      dispatch(addNotification({
-        type: 'success',
-        message: `Removed ${node.name} from context`,
-        title: 'Context Sync'
-      }));
-    } catch (error: any) {
-      dispatch(addNotification({
-        type: 'error',
-        message: error.message || 'Failed to unsync file',
-        title: 'Sync Error'
-      }));
-    }
-    setShowContextMenu(false);
-  };
-
-  const handleGenerateFile = async () => {
-    try {
-      dispatch(addNotification({
-        type: 'info',
-        message: `Generating ${node.name}...`,
-        title: 'File Generation'
-      }));
-      await dispatch(generateFile(node.path)).unwrap();
-      dispatch(addNotification({
-        type: 'success',
-        message: `Started generation for ${node.name}`,
-        title: 'Generation Started'
-      }));
-      setTimeout(() => {
-        dispatch(refreshFileList());
-      }, 2000);
-    } catch (error: any) {
-      dispatch(addNotification({
-        type: 'error',
-        message: error.message || 'Failed to generate file',
-        title: 'Generation Error'
-      }));
-    }
-    setShowContextMenu(false);
-  };
-
-  useEffect(() => {
-    const handleClick = () => setShowContextMenu(false);
-    if (showContextMenu) {
-      document.addEventListener('click', handleClick);
-      return () => document.removeEventListener('click', handleClick);
-    }
-  }, [showContextMenu]);
-
-  const getSyncIcon = () => {
-    if (!syncStatus || syncStatus.status === 'not-synced') return null;
-    switch (syncStatus.status) {
-      case 'synced': return '✓';
-      case 'syncing': return '⟳';
-      case 'error': return '✗';
-      case 'auto-eligible': return '●';
-      default: return null;
-    }
-  };
-
-  const getSyncStatusClass = () => {
-    if (!syncStatus) return '';
-    switch (syncStatus.status) {
-      case 'synced': return 'synced';
-      case 'syncing': return 'syncing';
-      case 'error': return 'error';
-      case 'auto-eligible': return 'auto-eligible';
-      default: return '';
-    }
-  };
-
-  if (node.type === 'directory') {
-    const isExpanded = expandedPaths.has(node.path);
-    return (
-      <div className="group">
-        <div className="file-tree-directory">
+  return (
+    <div className="file-tree-node">
+      {node.type === 'directory' ? (
+        <div className="file-tree-directory" style={{ paddingLeft: `${depth * 16}px` }}>
           <span
             className={cn('file-tree-chevron', isExpanded && 'expanded')}
             onClick={() => onDirectoryToggle(node.path)}
           >
-            ▶
+            {isExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
           </span>
           <span className="file-tree-folder-icon">
-            📁
+            {isExpanded ? <FolderOpen size={18} /> : <FolderClosed size={18} />}
           </span>
           <span
             className="file-tree-directory-name"
             onClick={() => onDirectoryClick ? onDirectoryClick(node.path) : onDirectoryToggle(node.path)}
+            title={node.name}
           >
             {node.name}
           </span>
         </div>
-        {isExpanded && node.children && (
-          <div className="file-tree-children">
-            <TreeList
-              nodes={node.children}
-              currentPath={currentPath}
-              expandedPaths={expandedPaths}
-              onFileClick={onFileClick}
-              onDirectoryToggle={onDirectoryToggle}
-              onDirectoryClick={onDirectoryClick}
-            />
-          </div>
-        )}
-      </div>
-    );
-  } else {
-    const isMissing = node.exists === false;
-    const isRequired = node.profileMetadata?.required;
-    const isSelected = currentPath === node.path;
-
-    return (
-      <>
+      ) : (
         <div
           className={cn(
             'file-tree-file',
             isMissing && 'missing',
             isSelected && 'selected'
           )}
+          style={{ paddingLeft: `${depth * 16 + 24}px` }}
           onClick={() => !isMissing && onFileClick(node.path)}
           onContextMenu={handleContextMenu}
-          title={isRequired ? `Required by profile: ${node.profileMetadata?.documentName}\n${node.profileMetadata?.description}` : undefined}
+          title={node.name}
         >
-          <span className={cn('file-tree-file-icon', isMissing ? 'missing' : 'normal')}>
-            {isMissing ? '⚠️' : '📄'}
+          <span className={cn('file-tree-file-icon', isMissing && 'missing')}>
+            {isMissing ? <File className="text-amber-600" size={16} /> : <File className="text-slate-600" size={16} />}
           </span>
-          <span className={cn(
-            'file-tree-file-name',
-            isSelected && 'selected',
-            isMissing && 'missing'
-          )}>
+          <span className={cn('file-tree-file-name', isSelected && 'selected', isMissing && 'missing')} title={node.name}>
             {node.name}
           </span>
-          <div className="file-tree-badges">
-            {isMissing && (
-              <span className="file-tree-badge missing">
-                Missing
-              </span>
-            )}
-            {isRequired && !isMissing && (
-              <span className="file-tree-badge required">
-                Required
-              </span>
-            )}
-            {getSyncIcon() && (
-              <span className={cn('file-tree-sync-icon', getSyncStatusClass())}>
-                {getSyncIcon()}
-              </span>
-            )}
-          </div>
         </div>
-        {showContextMenu && (
-          <div
-            className="file-tree-context-menu"
-            style={{ left: `${menuPosition.x}px`, top: `${menuPosition.y}px` }}
-          >
-            {isRequired && node.profileMetadata?.hasCommand && (
-              <>
-                <button
-                  className="file-tree-context-menu-item"
-                  onClick={handleGenerateFile}
-                >
-                  <span>⚡</span>
-                  <span>{isMissing ? 'Generate from Profile' : 'Regenerate'}</span>
-                </button>
-                <div className="file-tree-context-menu-divider"></div>
-              </>
-            )}
+      )}
 
-            {syncStatus?.status === 'synced' ? (
-              <button
-                className="file-tree-context-menu-item"
-                onClick={handleUnsyncFromContext}
-              >
-                <span>✗</span>
-                <span>Remove from Context</span>
-              </button>
-            ) : (
-              <button
-                className="file-tree-context-menu-item"
-                onClick={handleSyncToContext}
-              >
-                <span>☁</span>
-                <span>Sync to Context</span>
-              </button>
-            )}
-          </div>
-        )}
-      </>
-    );
-  }
+      {showContextMenu && (
+        <div
+          className="file-tree-context-menu"
+          style={{ left: menuPosition.x + 'px', top: menuPosition.y + 'px' }}
+          onClick={(e) => {
+            e.stopPropagation();
+            setShowContextMenu(false);
+          }}
+        >
+          <button
+            className="file-tree-context-menu-item"
+            onClick={() => {
+              navigator.clipboard.writeText(node.path);
+              dispatch(addNotification({
+                type: 'success',
+                message: `Copied ${node.name} path to clipboard`,
+                title: 'Copy Path'
+              }));
+              setShowContextMenu(false);
+            }}
+          >
+            <File size={14} />
+            <span>Copy Path</span>
+          </button>
+        </div>
+      )}
+    </div>
+  );
 });
+
+FileNode.displayName = 'FileNode';
 
 interface TreeListProps {
   nodes: TreeNode[];
@@ -293,9 +131,10 @@ interface TreeListProps {
   onFileClick: (path: string) => void;
   onDirectoryToggle: (path: string) => void;
   onDirectoryClick?: (path: string) => void;
+  depth: number;
 }
 
-const TreeList = memo(({ nodes, currentPath, expandedPaths, onFileClick, onDirectoryToggle, onDirectoryClick }: TreeListProps) => {
+const TreeList = memo(({ nodes, currentPath, expandedPaths, onFileClick, onDirectoryToggle, onDirectoryClick, depth }: TreeListProps) => {
   return (
     <ul className="file-tree-list">
       {nodes.map((node) => (
@@ -307,27 +146,143 @@ const TreeList = memo(({ nodes, currentPath, expandedPaths, onFileClick, onDirec
             onFileClick={onFileClick}
             onDirectoryToggle={onDirectoryToggle}
             onDirectoryClick={onDirectoryClick}
+            depth={depth}
           />
+          {node.type === 'directory' && expandedPaths.has(node.path) && node.children && (
+            <TreeList
+              nodes={node.children}
+              currentPath={currentPath}
+              expandedPaths={expandedPaths}
+              onFileClick={onFileClick}
+              onDirectoryToggle={onDirectoryToggle}
+              onDirectoryClick={onDirectoryClick}
+              depth={depth + 1}
+            />
+          )}
         </li>
       ))}
     </ul>
   );
 });
 
-function FileTreeComponent({ className }: FileTreeProps) {
+TreeList.displayName = 'TreeList';
+
+type SearchInputProps = {
+  value: string;
+  onChange: (value: string) => void;
+  onClear: () => void;
+}
+
+const SearchInput = memo(({ value, onChange, onClear }: SearchInputProps) => {
+  return (
+    <div className="file-tree-search">
+      <Search size={16} className="file-tree-search-icon" />
+      <input
+        type="text"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder="Search files..."
+        className="file-tree-search-input"
+      />
+      {value && (
+        <button
+          className="file-tree-search-clear"
+          onClick={onClear}
+          title="Clear search"
+        >
+          ✕
+        </button>
+      )}
+    </div>
+  );
+});
+
+SearchInput.displayName = 'SearchInput';
+
+export function FileTreeComponent({ className }: FileTreeProps) {
   const dispatch = useDispatch();
   const files = useSelector((state: RootState) => state.files.fileList);
   const loading = useSelector((state: RootState) => state.files.loading);
   const error = useSelector((state: RootState) => state.files.error);
   const refreshCounter = useSelector((state: RootState) => state.files.refreshCounter);
   const expandedPathsSet = useSelector((state: RootState) => new Set(state.ui.expandedPaths));
-  const [treeData, setTreeData] = React.useState<TreeNode[]>([]);
+  const [treeData, setTreeData] = useState<TreeNode[]>([]);
   const navigate = useNavigate();
   const [lastUpdateTime, setLastUpdateTime] = useState(0);
+
+  const [searchQuery, setSearchQuery] = useState('');
+  const [isAllCollapsed, setIsAllCollapsed] = useState(false);
 
   const currentPath = window.location.pathname.startsWith('/edit/')
     ? window.location.pathname.substring(6)
     : null;
+
+  useEffect(() => {
+    if (!files || !Array.isArray(files)) {
+      console.warn('Files is not an array:', files);
+      return;
+    }
+
+    const buildTree = (fileList: typeof files): TreeNode[] => {
+      const tree: TreeNode[] = [];
+      const dirMap = new Map<string, TreeNode>();
+
+      for (const file of fileList) {
+        const parts = file.path.split('/');
+
+        if (parts.length > 1) {
+          let currentPath = '';
+          for (let i = 0; i < parts.length - 1; i++) {
+            const part = parts[i];
+            currentPath = currentPath ? `${currentPath}/${part}` : part;
+
+            if (!dirMap.has(currentPath)) {
+              const dirNode: TreeNode = {
+                name: part,
+                type: 'directory',
+                path: currentPath,
+                children: []
+              };
+              dirMap.set(currentPath, dirNode);
+
+              const parentPath = currentPath.substring(0, currentPath.lastIndexOf('/'));
+              if (parentPath && dirMap.has(parentPath)) {
+                dirMap.get(parentPath)!.children!.push(dirNode);
+              } else if (!parentPath) {
+                tree.push(dirNode);
+              }
+            }
+          }
+        }
+      }
+
+      for (const file of fileList) {
+        const parts = file.path.split('/');
+        const fileName = parts[parts.length - 1];
+
+        const fileNode: TreeNode = {
+          name: fileName,
+          type: 'file',
+          path: file.path,
+          exists: file.exists
+        };
+
+        if (parts.length > 1) {
+          const parentPath = file.path.substring(0, file.path.lastIndexOf('/'));
+          if (dirMap.has(parentPath)) {
+            dirMap.get(parentPath)!.children!.push(fileNode);
+          }
+        } else {
+          tree.push(fileNode);
+        }
+      }
+
+      return tree;
+    };
+
+    const newTreeData = buildTree(files);
+    setTreeData(newTreeData);
+  }, [files]);
 
   const fetchFiles = useCallback(async (showLoading = false) => {
     try {
@@ -370,12 +325,77 @@ function FileTreeComponent({ className }: FileTreeProps) {
     }
   }, [dispatch, fetchFiles]);
 
+  const filteredTreeData = useMemo(() => {
+    if (!searchQuery.trim()) return treeData;
+
+    const filterNodes = (nodes: TreeNode[]): TreeNode[] => {
+      const result: TreeNode[] = [];
+
+      for (const node of nodes) {
+        const matchesSearch = node.name.toLowerCase().includes(searchQuery.toLowerCase());
+
+        if (matchesSearch) {
+          result.push(node);
+        } else if (node.type === 'directory' && node.children) {
+          const filteredChildren = filterNodes(node.children);
+          if (filteredChildren.length > 0) {
+            result.push({ ...node, children: filteredChildren });
+          }
+        }
+      }
+
+      return result;
+    };
+
+    return filterNodes(treeData);
+  }, [treeData, searchQuery]);
+
+  const expandAll = useCallback(() => {
+    const collectDirs = (nodes: TreeNode[], dirs: string[] = []): string[] => {
+      for (const node of nodes) {
+        if (node.type === 'directory') {
+          dirs.push(node.path);
+          if (node.children) {
+            collectDirs(node.children, dirs);
+          }
+        }
+      }
+      return dirs;
+    };
+
+    const allDirs = collectDirs(treeData);
+    for (const path of allDirs) {
+      dispatch(expandPath(path));
+    }
+    setIsAllCollapsed(false);
+  }, [dispatch, treeData]);
+
+  const collapseAll = useCallback(() => {
+    const collectDirs = (nodes: TreeNode[], dirs: string[] = []): string[] => {
+      for (const node of nodes) {
+        if (node.type === 'directory') {
+          dirs.push(node.path);
+          if (node.children) {
+            collectDirs(node.children, dirs);
+          }
+        }
+      }
+      return dirs;
+    };
+
+    const allDirs = collectDirs(treeData);
+    for (const path of allDirs) {
+      dispatch(togglePathExpanded(path));
+    }
+    setIsAllCollapsed(true);
+  }, [dispatch, treeData]);
+
   useEffect(() => {
     fetchFiles(files.length === 0);
   }, [refreshCounter, fetchFiles, files.length]);
 
   useEffect(() => {
-    connectWebSocket();
+    webSocketService.connect();
 
     const handleFileAdded = (data: any) => {
       console.log('File added via WebSocket:', data);
@@ -431,126 +451,24 @@ function FileTreeComponent({ className }: FileTreeProps) {
     };
   }, [fetchFiles, lastUpdateTime]);
 
-  useEffect(() => {
-    if (currentPath) {
-      const isDirectory = currentPath.endsWith('/') || !currentPath.includes('.');
-      const pathToExpand = isDirectory ? currentPath : currentPath.substring(0, currentPath.lastIndexOf('/'));
-      const pathParts = pathToExpand.split('/');
-      let currentDirPath = '';
-
-      for (let i = 0; i < pathParts.length; i++) {
-        if (pathParts[i]) {
-          currentDirPath = currentDirPath
-            ? `${currentDirPath}/${pathParts[i]}`
-            : pathParts[i];
-          dispatch(expandPath(currentDirPath));
-        }
-      }
-    }
-  }, [currentPath, dispatch]);
-
-  useEffect(() => {
-    const buildTree = (files: FileInfo[]) => {
-      const root: TreeNode[] = [];
-      const directoryMap: Record<string, TreeNode> = {};
-
-      if (!files || !Array.isArray(files)) {
-        console.warn('Files is not an array:', files);
-        return root;
-      }
-
-      files.forEach(file => {
-        const pathParts = file.path.split('/');
-        let currentPath = '';
-        for (let i = 0; i < pathParts.length - 1; i++) {
-          const part = pathParts[i];
-          const parentPath = currentPath;
-          currentPath = currentPath ? `${currentPath}/${part}` : part;
-
-          if (!directoryMap[currentPath]) {
-            const newDir: TreeNode = {
-              name: part,
-              children: [],
-              type: 'directory',
-              path: currentPath,
-            };
-            directoryMap[currentPath] = newDir;
-
-            if (parentPath) {
-              directoryMap[parentPath].children = directoryMap[parentPath].children || [];
-              directoryMap[parentPath].children?.push(newDir);
-            } else {
-              root.push(newDir);
-            }
-          }
-        }
-      });
-
-      files.forEach(file => {
-        const pathParts = file.path.split('/');
-        const fileName = pathParts[pathParts.length - 1];
-        const parentPath = pathParts.slice(0, -1).join('/');
-
-        const fileNode: TreeNode = {
-          name: fileName,
-          type: 'file',
-          path: file.path,
-          exists: file.exists !== undefined ? file.exists : true,
-          profileMetadata: file.profileMetadata,
-        };
-
-        if (parentPath && directoryMap[parentPath]) {
-          directoryMap[parentPath].children = directoryMap[parentPath].children || [];
-          directoryMap[parentPath].children?.push(fileNode);
-        } else {
-          root.push(fileNode);
-        }
-      });
-
-      const sortNodes = (nodes: TreeNode[]) => {
-        nodes.sort((a, b) => {
-          if (a.type === 'directory' && b.type === 'file') return -1;
-          if (a.type === 'file' && b.type === 'directory') return 1;
-          return a.name.localeCompare(b.name);
-        });
-        nodes.forEach(node => {
-          if (node.type === 'directory' && node.children) {
-            sortNodes(node.children);
-          }
-        });
-      };
-
-      sortNodes(root);
-      return root;
-    };
-
-    setTreeData(buildTree(files));
-  }, [files]);
-
   const handleFileClick = (path: string) => {
     navigate(`/edit/${path}`);
   };
 
   const handleDirectoryClick = (path: string) => {
-    const dirPath = path.endsWith('/') ? path : `${path}/`;
-    navigate(`/edit/${dirPath}`);
+    navigate(`/edit/${path}`);
   };
 
   const handleDirectoryToggle = (path: string) => {
     dispatch(togglePathExpanded(path));
   };
 
-  const renderTree = (nodes: TreeNode[], currentPath: string | null, expandedPaths: Set<string>, handleFileClick: (path: string) => void, handleDirectoryToggle: (path: string) => void, handleDirectoryClick: (path: string) => void) => {
-    return (
-      <TreeList
-        nodes={nodes}
-        currentPath={currentPath}
-        expandedPaths={expandedPaths}
-        onFileClick={handleFileClick}
-        onDirectoryToggle={handleDirectoryToggle}
-        onDirectoryClick={handleDirectoryClick}
-      />
-    );
+  const handleSearchChange = (value: string) => {
+    setSearchQuery(value);
+  };
+
+  const handleClearSearch = () => {
+    setSearchQuery('');
   };
 
   if (loading) {
@@ -561,56 +479,65 @@ function FileTreeComponent({ className }: FileTreeProps) {
     return <div className="file-tree-loading" style={{ color: 'red' }}>{error}</div>;
   }
 
+  const displayData = searchQuery.trim() ? filteredTreeData : treeData;
+  const hasResults = displayData.length > 0;
+
   return (
     <div className={cn("file-tree-container", className)}>
       <div className="file-tree-header">
-        <h2 className="file-tree-title">Files</h2>
-        <div className="file-tree-actions">
-          <button
-            className="file-tree-refresh-btn"
-            onClick={refreshFiles}
-            title="Refresh file list"
-          >
-            🔄
-          </button>
-          <Button
-            variant="outline"
-            size="sm"
-            className="h-7 text-xs"
-            onClick={() => {
-              let fileName = prompt('Enter new file name:') || '';
-              if (fileName) {
-                if (!fileName.toLowerCase().endsWith('.md')) {
-                  fileName = `${fileName}.md`;
-                }
-
-                fileApi.createFile(fileName, '# New File\n\nStart writing here...')
-                  .then(() => {
-                    dispatch(refreshFileList());
-                    dispatch(addNotification({
-                      type: 'success',
-                      message: `File ${fileName} created successfully`,
-                      title: 'Success'
-                    }));
-                    navigate(`/edit/${encodeURIComponent(fileName)}`);
-                  })
-                  .catch(err => {
-                    console.error('Error creating file:', err);
-                  });
-              }
-            }}
-          >
-            New File
-          </Button>
+        <div className="file-tree-header-left">
+          <h2 className="file-tree-title">Files</h2>
+          <div className="file-tree-actions">
+            <SearchInput
+              value={searchQuery}
+              onChange={handleSearchChange}
+              onClear={handleClearSearch}
+            />
+            <button
+              className="file-tree-refresh-btn"
+              onClick={refreshFiles}
+              title="Refresh file list"
+            >
+              🔄
+            </button>
+            <button
+              className={cn('file-tree-collapse-btn', isAllCollapsed && 'collapsed')}
+              onClick={isAllCollapsed ? expandAll : collapseAll}
+              title={isAllCollapsed ? 'Expand all' : 'Collapse all'}
+            >
+              {isAllCollapsed ? <FolderOpen size={16} /> : <FolderClosed size={16} />}
+            </button>
+          </div>
         </div>
       </div>
-      {treeData.length > 0 ? (
-        renderTree(treeData, currentPath, expandedPathsSet, handleFileClick, handleDirectoryToggle, handleDirectoryClick)
+
+      {hasResults ? (
+        <TreeList
+          nodes={displayData}
+          currentPath={currentPath}
+          expandedPaths={expandedPathsSet}
+          onFileClick={handleFileClick}
+          onDirectoryToggle={handleDirectoryToggle}
+          onDirectoryClick={handleDirectoryClick}
+          depth={0}
+        />
       ) : (
-        <div className="file-tree-empty">No files found</div>
+        <div className="file-tree-empty">
+          {searchQuery.trim() ? (
+            <>
+              <Search size={32} className="text-muted-400 mb-4" />
+              <p>No files found matching &quot;{searchQuery}&quot;</p>
+            </>
+          ) : (
+            <>
+              <File className="text-muted-400 mb-4" size={32} />
+              <p>No files found</p>
+            </>
+          )}
+        </div>
       )}
     </div>
   );
 }
 
-export const FileTree = React.memo(FileTreeComponent);
+export const FileTree = memo(FileTreeComponent);
