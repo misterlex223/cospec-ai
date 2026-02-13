@@ -70,9 +70,9 @@ class GitService {
       }
 
       // Parse file changes
-      const match = line.match(/^([MADR? ?])(?:\s+(\d+))?\s+(.+)$/);
+      const match = line.match(/^([MADR? ?])(?:\s+\d+)?\s+(.+)$/);
       if (match) {
-        const [_, status, score, filePath] = match;
+        const [_, status, filePath] = match;
         if (currentResult) currentResult = { success: true };
         results.push({ type: 'file', status: status.trim(), path: filePath });
         continue;

@@ -77,6 +77,10 @@ const helmet = require('helmet');
 
 // Agent Service
 const AgentService = require('./agentService');
+// Git Service
+const GitService = require('./services/gitService');
+const gitService = new GitService(path.join(__dirname, '..', 'markdown'));
+console.log('✓ Git service ready');
 const AgentDB = require('./agentDb');
 
 // Initialize Agent DB and Service
@@ -1145,6 +1149,95 @@ app.delete('/api/agent/conversations/:id', authenticateToken, async (req, res) =
 });
 
 // ============================================================================
+
+// ============================================================================
+// Git API Routes
+// ============================================================================
+
+app.get('/api/git/status', async (req, res) => {
+  try {
+    const result = await gitService.getStatus();
+    res.json(result);
+  } catch (error) {
+    console.error('Git status error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.get('/api/git/log', async (req, res) => {
+  try {
+    const limit = parseInt(req.query.limit) || 20;
+    const offset = parseInt(req.query.offset) || 0;
+    const result = await gitService.getLog(limit, offset);
+    res.json(result);
+  } catch (error) {
+    console.error('Git log error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.get('/api/git/commit/:id', async (req, res) => {
+  try {
+    const result = await gitService.getCommit(req.params.id);
+    res.json(result);
+  } catch (error) {
+    console.error('Git commit error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.get('/api/git/diff', async (req, res) => {
+  try {
+    const { pathA, pathB } = req.query;
+    if (!pathA || !pathB) {
+      return res.status(400).json({ error: 'pathA and pathB are required' });
+    }
+    const result = await gitService.diff(pathA, pathB);
+    res.json(result);
+  } catch (error) {
+    console.error('Git diff error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.get('/api/git/branches', async (req, res) => {
+  try {
+    const branches = await gitService.getBranches();
+    res.json({ branches });
+  } catch (error) {
+    console.error('Git branches error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post('/api/git/stage', authenticateToken, async (req, res) => {
+  try {
+    const { files } = req.body;
+    if (!Array.isArray(files)) {
+      return res.status(400).json({ error: 'files must be an array' });
+    }
+    const result = await gitService.stageFiles(files);
+    res.json(result);
+  } catch (error) {
+    console.error('Git stage error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post('/api/git/commit', authenticateToken, async (req, res) => {
+  try {
+    const { message } = req.body;
+    if (!message) {
+      return res.status(400).json({ error: 'message is required' });
+    }
+    const result = await gitService.commitFiles(message);
+    res.json(result);
+  } catch (error) {
+    console.error('Git commit error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // File CRUD Routes (General wildcard routes - MUST be after specific routes)
 // ============================================================================
 

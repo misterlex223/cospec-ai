@@ -754,6 +754,14 @@ class AgentService {
       messages
     };
   }
+
+  emitGitProgress(data, isError) {
+    io.emit('git-progress', {
+      type: isError ? 'error' : 'progress',
+      data,
+      timestamp: new Date().toISOString()
+    });
+  }
 }
 
 module.exports = AgentService;
