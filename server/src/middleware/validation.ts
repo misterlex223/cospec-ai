@@ -47,13 +47,15 @@ export function validateContentLength(content: string, maxSize: number): void {
   }
 }
 
-export function createValidationMiddleware(_config: ValidationConfig = {}): (
-  _req: ExpressRequest,
-  _res: ExpressResponse,
-  next: NextFunction
-) => void {
-  // TODO: Implement full validation logic
-  next();
+export function createValidationMiddleware(_config: ValidationConfig = {}) {
+  return (
+    _req: ExpressRequest,
+    _res: ExpressResponse,
+    next: NextFunction
+  ): void => {
+    // TODO: Implement full validation logic
+    next();
+  };
 }
 
 export {};

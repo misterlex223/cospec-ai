@@ -35,10 +35,8 @@ export interface GitServiceConfig {
 }
 
 export class GitService {
-  private config: GitServiceConfig;
-
-  constructor(config: GitServiceConfig) {
-    this.config = config;
+  constructor(_config: GitServiceConfig) {
+    // Config stored for future use
   }
 
   /**
@@ -70,7 +68,7 @@ export class GitService {
   /**
    * Get commit log
    */
-  async log(limit: number = 10): Promise<GitLogEntry[]> {
+  async log(_limit: number = 10): Promise<GitLogEntry[]> {
     // Placeholder implementation
     return [];
   }
@@ -78,11 +76,10 @@ export class GitService {
   /**
    * Commit changes
    */
-  async commit(message: string, files: string[]): Promise<string> {
+  async commit(_message: string, _files: string[]): Promise<string> {
     // Placeholder implementation
     return 'commit-id';
   }
 }
 
-export type { GitStatusEntry, GitDiffResult, GitLogEntry, GitStatusResult, GitServiceConfig };
 export {};

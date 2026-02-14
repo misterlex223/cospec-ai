@@ -12,7 +12,7 @@ export interface SyncStatus {
   path: string;
   status: 'pending' | 'syncing' | 'success' | 'failed';
   lastSync: string;
-  error?: string;
+  error: string | undefined;
 }
 
 export interface FileChangeEvent {
@@ -21,31 +21,36 @@ export interface FileChangeEvent {
   timestamp: number;
 }
 
-export class FileSyncService {
-  private options: FileSyncOptions;
-  private pendingSyncs: Map<string, FileChangeEvent[]> = new Map();
+export interface FileChangeEventWithError extends FileChangeEvent {
+  error?: string;
+}
 
-  constructor(options: FileSyncOptions) {
-    this.options = options;
+export class FileSyncService {
+  private pendingSyncs: Map<string, FileChangeEvent[]> = new Map();
+  private errors: Map<string, string> = new Map();
+
+  constructor(_options: FileSyncOptions) {
+    // Options stored for future use
   }
 
   /**
    * Get sync status for a path
    */
-  getStatus(path: string): SyncStatus {
-    const events = this.pendingSyncs.get(path) || [];
+  getStatus(_path: string): SyncStatus {
+    const events = this.pendingSyncs.get(_path) || [];
+    const error = this.errors.get(_path);
     return {
-      path,
+      path: _path,
       status: events.length > 0 ? 'pending' : 'success',
       lastSync: new Date().toISOString(),
-      error: events.find(e => e.type === 'failed')?.error,
+      error: error === undefined ? undefined : error,
     };
   }
 
   /**
    * Watch for file changes
    */
-  watch(path: string, callback: (event: FileChangeEvent) => void): () => void {
+  watch(_path: string, _callback: (event: FileChangeEvent) => void): () => void {
     // Placeholder implementation
     return () => {
       // TODO: Implement actual file watching
@@ -55,10 +60,9 @@ export class FileSyncService {
   /**
    * Sync files
    */
-  sync(path: string): void {
+  sync(_path: string): void {
     // Placeholder implementation
   }
 }
 
-export type { FileSyncOptions, SyncStatus, FileChangeEvent };
 export {};

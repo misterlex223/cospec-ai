@@ -11,7 +11,7 @@ export interface LogEntry {
   timestamp: string;
   level: string;
   message: string;
-  context?: string;
+  context?: string | undefined;
   error?: unknown;
 }
 
@@ -26,8 +26,8 @@ export class Logger {
     if (this.config.format === 'json') {
       return JSON.stringify(entry);
     }
-    const { timestamp, level, message, context } = entry;
-    const contextStr = context ? `[${context}] ` : '';
+    const { timestamp, level, message } = entry;
+    const contextStr = entry.context ? `[${entry.context}] ` : '';
     return `${timestamp} ${level} ${contextStr}${message}`;
   }
 
@@ -37,7 +37,7 @@ export class Logger {
         timestamp: new Date().toISOString(),
         level: 'DEBUG',
         message,
-        context,
+        context: context === undefined ? undefined : context,
         error,
       }));
     }
@@ -45,11 +45,11 @@ export class Logger {
 
   info(message: string, context?: string, error?: unknown): void {
     if (this.config.level === 'debug' || this.config.level === 'info') {
-      console.info(this.format({
+      console.log(this.format({
         timestamp: new Date().toISOString(),
         level: 'INFO',
         message,
-        context,
+        context: context === undefined ? undefined : context,
         error,
       }));
     }
@@ -61,7 +61,7 @@ export class Logger {
         timestamp: new Date().toISOString(),
         level: 'WARN',
         message,
-        context,
+        context: context === undefined ? undefined : context,
         error,
       }));
     }
@@ -72,7 +72,7 @@ export class Logger {
       timestamp: new Date().toISOString(),
       level: 'ERROR',
       message,
-      context,
+      context: context === undefined ? undefined : context,
       error,
     }));
   }
@@ -84,5 +84,4 @@ export const logger = new Logger({
   format: (process.env.LOG_FORMAT as LoggerConfig['format']) || 'json',
 });
 
-export type { LoggerConfig, LogEntry };
 export {};

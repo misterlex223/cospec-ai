@@ -20,7 +20,7 @@ export interface RateLimitOptions {
   skipFailedRequests?: boolean;
 }
 
-export function createRateLimiter(options: RateLimitOptions): RateLimitRequestHandler {
+export function createRateLimiter(_options: RateLimitOptions): RateLimitRequestHandler {
   return (_req: ExpressRequest, _res: any, next: () => void) => {
     // Placeholder implementation
     // TODO: Implement actual rate limiting

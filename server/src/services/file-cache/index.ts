@@ -26,12 +26,12 @@ export class FileCache {
   /**
    * Get cached value
    */
-  get<T>(key: string): T | undefined {
-    const entry = this.cache.get(key) as CacheEntry<T> | undefined;
+  get<T>(_key: string): T | undefined {
+    const entry = this.cache.get(_key) as CacheEntry<T> | undefined;
     if (!entry) return undefined;
 
     if (Date.now() - entry.timestamp > entry.ttl) {
-      this.cache.delete(key);
+      this.cache.delete(_key);
       return undefined;
     }
 
@@ -41,15 +41,15 @@ export class FileCache {
   /**
    * Set cached value
    */
-  set<T>(key: string, value: T, ttl?: number): void {
+  set<T>(_key: string, value: T, ttl?: number): void {
     const entry: CacheEntry<T> = {
       value,
       timestamp: Date.now(),
       ttl: ttl ?? this.options.defaultTTL,
     };
 
-    this.cache.set(key, entry);
-    this.keys.push(key);
+    this.cache.set(_key, entry);
+    this.keys.push(_key);
 
     // Enforce max size
     if (this.cache.size > this.options.maxSize) {
@@ -63,15 +63,15 @@ export class FileCache {
   /**
    * Check if key exists
    */
-  has(key: string): boolean {
-    return this.cache.has(key);
+  has(_key: string): boolean {
+    return this.cache.has(_key);
   }
 
   /**
    * Delete cached value
    */
-  delete(key: string): boolean {
-    return this.cache.delete(key);
+  delete(_key: string): boolean {
+    return this.cache.delete(_key);
   }
 
   /**
@@ -93,5 +93,4 @@ export class FileCache {
   }
 }
 
-export type { CacheEntry, CacheOptions };
 export {};

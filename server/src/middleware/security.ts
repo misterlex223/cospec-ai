@@ -16,8 +16,8 @@ export interface SecurityConfig {
       defaultSrc?: string[];
       styleSrc?: string[];
       scriptSrc?: string[];
-      };
     };
+  };
   hsts?: {
     maxAge?: number;
     includeSubDomains?: boolean | string[];
@@ -27,45 +27,47 @@ export interface SecurityConfig {
   noSniff?: boolean;
 }
 
-export function createSecurityMiddleware(config: SecurityConfig = {}): (
-  _req: unknown,
-  res: ExpressResponse,
-  next: NextFunction
-) => void {
-  // Set security headers
-  if (config.contentSecurityPolicy) {
-    const directives = config.contentSecurityPolicy.directives || {};
-    const defaultSrc = directives.defaultSrc || ['\'self\''];
-    const styleSrc = directives.styleSrc || ['\'self\'', '\'unsafe-inline\''];
-    const scriptSrc = directives.scriptSrc || ['\'self\''];
+export function createSecurityMiddleware(config: SecurityConfig = {}) {
+  return (
+    _req: unknown,
+    res: ExpressResponse,
+    next: NextFunction
+  ): void => {
+    // Set security headers
+    if (config.contentSecurityPolicy) {
+      const directives = config.contentSecurityPolicy.directives || {};
+      const defaultSrc = directives.defaultSrc || ['\'self\''];
+      const styleSrc = directives.styleSrc || ['\'self\'', '\'unsafe-inline\''];
+      const scriptSrc = directives.scriptSrc || ['\'self\''];
 
-    const policy = [
-      `default-src ${defaultSrc.join(' ')}`,
-      `style-src ${styleSrc.join(' ')}`,
-      `script-src ${scriptSrc.join(' ')}`
-    ].join('; ');
+      const policy = [
+        `default-src ${defaultSrc.join(' ')}`,
+        `style-src ${styleSrc.join(' ')}`,
+        `script-src ${scriptSrc.join(' ')}`
+      ].join('; ');
 
-    res.setHeader('Content-Security-Policy', policy);
-  }
+      res.setHeader('Content-Security-Policy', policy);
+    }
 
-  if (config.hsts) {
-    const maxAge = config.hsts.maxAge || 31536000;
-    res.setHeader('Strict-Transport-Security', `max-age=${maxAge}; includeSubDomains`);
-  }
+    if (config.hsts) {
+      const maxAge = config.hsts.maxAge || 31536000;
+      res.setHeader('Strict-Transport-Security', `max-age=${maxAge}; includeSubDomains`);
+    }
 
-  if (config.crossOriginEmbedderPolicy) {
-    res.setHeader('X-Content-Type-Options', 'nosniff');
-  }
+    if (config.crossOriginEmbedderPolicy) {
+      res.setHeader('X-Content-Type-Options', 'nosniff');
+    }
 
-  if (config.xssFilter ?? true) {
-    res.setHeader('X-XSS-Protection', '1; mode=block');
-  }
+    if (config.xssFilter ?? true) {
+      res.setHeader('X-XSS-Protection', '1; mode=block');
+    }
 
-  if (config.noSniff ?? true) {
-    res.setHeader('X-Content-Type-Options', 'nosniff');
-  }
+    if (config.noSniff ?? true) {
+      res.setHeader('X-Content-Type-Options', 'nosniff');
+    }
 
-  next();
+    next();
+  };
 }
 
 export {};
