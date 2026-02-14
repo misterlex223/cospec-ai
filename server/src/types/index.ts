@@ -2,16 +2,18 @@
  * Central type exports
  */
 
-export type { ExpressRequest, ExpressResponse, ExpressRouter, NextFunction } from './express.js';
-export type { AuthenticatedRequest } from './express.js';
-export type { FileRequest } from './express.js';
-export type { ProfileRequest } from './express.js';
-export type { GitRequest } from './express.js';
-export type { AgentRequestBody } from './express.js';
+export type {
+  ExpressRequest,
+  ExpressResponse,
+  AuthenticatedRequest,
+  FileRequest,
+  ProfileRequest,
+  GitRequest,
+  AgentRequestBody,
+} from './express.js';
 
 export type {
   AgentType,
-  AgentExecution,
   ChatMessage,
   Conversation,
   SuggestionTemplate,
@@ -54,7 +56,6 @@ export type {
 } from './websocket.js';
 
 export type {
-  DatabaseConfig,
   ServiceOptions,
   CacheOptions,
   WatcherOptions,
@@ -66,11 +67,12 @@ export type {
   ValidationError,
   FileSystemError,
   ServiceError,
+  ApiError,
 } from './error.js';
 
 export type {
-  ApiErrorDetail,
   ApiResponse,
+  ApiErrorDetail,
   PaginatedResponse,
   FileListResponse,
   AgentListResponse,
@@ -86,3 +88,12 @@ export type {
   ParameterSchema,
   ValidationResult,
 } from './function.js';
+
+export type {
+  DatabaseConfig,
+  SqliteResult,
+  AgentRecord,
+  AgentExecution,
+  ConversationRecord,
+  ChatMessageRecord,
+} from './database.js';

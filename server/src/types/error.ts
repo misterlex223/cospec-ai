@@ -5,7 +5,7 @@
 export class AppError extends Error {
   constructor(
     message: string,
-    public code: string,
+    public code: string = 'APP_ERROR',
     public statusCode: number = 500,
     public details?: unknown
   ) {
@@ -54,5 +54,3 @@ export interface ApiError {
   details?: unknown;
   timestamp: string;
 }
-
-export {};

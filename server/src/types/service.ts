@@ -2,11 +2,6 @@
  * Service layer types
  */
 
-export interface DatabaseConfig {
-  path: string;
-  readonly?: boolean;
-}
-
 export interface ServiceOptions {
   debug?: boolean;
   timeout?: number;

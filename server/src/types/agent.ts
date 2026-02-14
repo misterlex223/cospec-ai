@@ -10,22 +10,6 @@ export interface AgentType {
   capabilities: string[];
 }
 
-export interface AgentExecution {
-  id: string;
-  agentType: string;
-  targetFiles: string[];
-  status: 'running' | 'success' | 'failed';
-  startTime: string;
-  endTime?: string;
-  duration?: number;
-  summary?: string;
-  outputFile?: string;
-  error?: string;
-  retryCount: number;
-  customPrompt?: string;
-  createdAt: string;
-}
-
 export interface ChatMessage {
   id: string;
   role: 'user' | 'assistant' | 'system';
