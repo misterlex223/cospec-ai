@@ -352,19 +352,6 @@ class AgentDB {
     });
   }
 
-      this.db.run(sql, [
-        id,
-        conversationId,
-        role,
-        content,
-        now
-      ], function(err) {
-        if (err) reject(err);
-        else resolve(id);
-      }
-      });
-    });
-  }
 
   async getMessagesByConversation(conversationId, options = {}) {
     const { limit = 100, offset = 0 } = options;
@@ -403,8 +390,7 @@ class AgentDB {
         [conversationId],
         (err, rows) => {
           if (err) reject(err);
-          else if (rows.length === 0) {
-            resolve(null);
+          else if (rows.length === 0)  resolve(null);
           else {
             const conv = rows[0];
             this.getMessagesByConversation(conv.id).then(messages => {
@@ -505,7 +491,6 @@ class AgentDB {
       } else {
         resolve();
       }
-    });
   });
   }
 }

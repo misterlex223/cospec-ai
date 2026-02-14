@@ -18,7 +18,7 @@ class GitService {
    */
   async exec(command, args = []) {
     return new Promise((resolve, reject) => {
-      const gitCmd = spawn('git', ['--git-dir', this.gitDir, ...args.map(a => a.toString()), command], {
+      const gitCmd = spawn('git', ['--git-dir', this.gitDir, command, ...args.map(a => a.toString())], {
         cwd: this.repoPath,
         env: { ...process.env }
       });
@@ -32,7 +32,7 @@ class GitService {
       });
       gitCmd.stderr.on('data', (data) => {
         errorOutput += data.toString();
-        this.emitProgress(data, true);
+        this.emitProgress(data.toString(), true);
       });
 
       gitCmd.on('close', (code) => {
